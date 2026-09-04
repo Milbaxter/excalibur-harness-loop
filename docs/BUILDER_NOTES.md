@@ -50,7 +50,7 @@ minimal composition (persona + bash + fs read/write only) per spec §5.4 step 4.
 
 ## 4. Meta-review is asynchronous; the primary reviewer is a scheduled Cursor agent
 
-This overrides spec §9.2. A **Supervisor Automation** (see `docs/SUPERVISOR_AUTOMATION.md`) wakes
+Spec §9.2 describes this; the operational detail is here. A **Supervisor Automation** (see `docs/SUPERVISOR_AUTOMATION.md`) wakes
 hourly, finds any `results/meta/<n>/bundle.md` without a `proposals.json`, writes the proposals, and
 commits. The controller must therefore:
 

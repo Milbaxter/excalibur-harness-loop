@@ -13,8 +13,8 @@ Status: v1 spec, ready to implement. Written for an implementing model (e.g. Gro
 | **Subject under test** | DeepSeek Harness (`dsh`) running **DeepSeek V4 Flash** in headless one-shot mode, composed as `base stack + candidate plugin`. |
 | **Benchmark** | **Terminal-Bench 2.1** (89 Docker tasks) run through **Harbor**, restricted to a calibrated **hard "dev" subset (~30 tasks)** on which the baseline scores 10–40%, plus a **held-out subset (~15 tasks)** used only to confirm accepted plugins. |
 | **Sandboxes** | **Daytona** cloud sandboxes via Harbor `--env daytona` (trials are I/O-bound, so 60–120 concurrent trials). The Cursor VM never runs task containers. |
-| **Controller** | A Python CLI (`excalibur`) in this repo, driven by a **Cursor Cloud Agent** (long-running run, or a cron **Automation** that resumes from the git-committed ledger every 30 min). |
-| **Meta-reviewer** | Every N=8 (configurable 5–10) candidates, a frontier model is invoked through Cursor's headless CLI (`agent -p --model <smart>`) with the ledger, failure clusters, and sample trajectories; it emits structured proposals (new plugins, harness/evaluator fixes, hack flags). |
+| **Controller** | A Python CLI (`excalibur`) in this repo, built and operated by a **Cursor Cloud Agent** (the *builder*), with all state in the git-committed ledger so any agent can resume it. |
+| **Supervisor / meta-reviewer** | A **Cursor Automation** (hourly cron, strongest available model) wakes, reads the ledger, and: writes `proposals.json` for any pending review bundle (every N=8 decided candidates the controller writes one), restarts a stalled loop, answers the builder's questions, flags budget/safety issues. Reviews are asynchronous; DeepSeek V4 Pro is the fallback reviewer. See §9 and `docs/SUPERVISOR_AUTOMATION.md`. |
 | **Metrics** | Pass rate (mean reward), **billed tokens/task**, USD/task, wall time/task. Acceptance requires a paired improvement on the dev set, confirmation on hold-out, and a token budget constraint (§7). |
 | **Anti-hacking** | Static scan of plugin source, sealed hold-out, cross-distribution canary tasks, meta-review audit, and the rule that a plugin must be describable without reference to any task (§8). |
 | **Budget (overnight)** | ~100 candidates in ~8–10 h. Cost is driven by trial volume (~4.5–7k agentic rollouts × ~1.5M mostly-cached prompt tokens each), not the per-token price: **≈ $300–550 lean, $450–750 standard** *(est., §6.5)*. DeepSeek tokens ≈ 60%, Daytona ≈ 20%, meta-review ≈ 10%. Achieved via three-stage funnel (smoke → screen → confirm) and evaluating 4 candidates in parallel. |
@@ -73,7 +73,7 @@ Sources: [Cloud Agents API](https://cursor.com/docs/cloud-agent/api/endpoints), 
 - **Long-running agents** (Ultra/Teams/Enterprise): multi-hour runs (Cursor cites 25–52 h examples). No user-configurable max runtime; runs can be recycled. Plan for **resume-from-git** regardless.
 - **Automations**: schedule (cron) or event (webhook/GitHub/Slack/Linear) triggers that start a cloud agent with instructions and a repo. This is the fallback/heartbeat mechanism: "every 30 min, run `excalibur resume`".
 - **Cloud Agents API v1 / SDK**: `POST /v1/agents` creates agent + first run; `POST /v1/agents/{id}/runs` sends follow-ups (409 if a run is active); SSE streaming; `Agent.create({cloud:{repos}})`. Useful for a controller that fans out, but not required for v1 of Excalibur.
-- **Headless CLI**: `agent -p --force --model <model> --output-format json "<prompt>"` runs a full Cursor agent (tools, repo access) non-interactively. `agent --list-models` enumerates models. This is how the meta-reviewer is invoked with a frontier model without a separate API key — it bills to the Cursor account.
+- **Headless CLI**: `agent -p --force --model <model> --output-format json "<prompt>"` runs a full Cursor agent (tools, repo access) non-interactively; `agent --list-models` enumerates models. Useful locally; inside a Cloud Agent VM it may not be installed or authenticated, which is why the meta-reviewer is a scheduled Automation (§9.2) rather than an in-VM CLI call.
 - **Secrets**: Cloud Agents > Secrets in the dashboard inject env vars into VMs (`DEEPSEEK_API_KEY`, `DAYTONA_API_KEY`, optional `CURSOR_API_KEY`). Values are redacted in transcripts.
 - **Concurrency**: Pro ≈ 8 simultaneous cloud agents; higher tiers more. Excalibur needs exactly one controller agent at a time (the ledger lock enforces this).
 
@@ -106,7 +106,7 @@ Terminal-Bench full-run economics (Ante, 89 tasks × 5 trials, Flash 0731): ~$68
 │  ├─ results/    (ledger.jsonl, leaderboard, per-candidate reports; committed after each step)│
 │  └─ .cursor/    (environment.json, Dockerfile, agents/, automation instructions)             │
 │                                                                                             │
-│  meta-review: `agent -p --model <frontier> --output-format json -f "$(cat prompt.md)"`      │
+│  meta-review: writes results/meta/<n>/bundle.md, commits, continues (async, §9)            │
 └───────────────┬───────────────────────────────────────────────────────┬─────────────────────┘
                 │ Harbor spawns one sandbox per trial                   │ git push after every
                 ▼                                                       ▼ candidate decision
@@ -118,6 +118,12 @@ Terminal-Bench full-run economics (Ante, 89 tasks × 5 trials, Flash 0731): ~$68
 │   └─► DeepSeek API (V4 Flash)                             │
 │  session.jsonl copied out as artifact → tokens/task        │
 └────────────────────────────────────────────────────────────┘
+                                                                        ▲
+┌──────────── Supervisor: Cursor Automation (hourly cron, frontier model) ─────────────────────┐
+│  git pull → read ledger/milestones/LOCK → write results/meta/<n>/proposals.json if pending   │
+│  → restart loop if LOCK stale (`excalibur resume`) → answer builder in results/ANSWERS.md    │
+│  → flag budget/safety → commit only under results/meta/**, SUPERVISOR_LOG.md, ANSWERS.md      │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 Components:
@@ -126,11 +132,11 @@ Components:
 2. **Evaluator** — Harbor (`uv tool install harbor`) with a custom `BaseInstalledAgent` subclass `DshAgent` that installs DSH into each task container and runs the headless profile. Trials run in Daytona sandboxes.
 3. **Subject** — DSH pinned version, profile `excalibur` = `excalibur-base` bundle + accepted plugins + candidate under test, model `deepseek-v4-flash`.
 4. **Registry** — `plugins/<id>/` directories with `plugin.yaml` manifest + TS source or npm spec. `results/ledger.jsonl` append-only event log.
-5. **Meta-reviewer** — Cursor headless CLI invocation with a frontier model; reads a review bundle, writes `results/meta/<n>/proposals.json`; controller turns proposals into queued candidates/issues.
+5. **Supervisor / meta-reviewer** — a scheduled Cursor Automation running a frontier model with full repo access. Reads review bundles and writes `results/meta/<n>/proposals.json`; restarts a stalled loop; answers the builder's questions; audits for benchmark hacking. The controller turns proposals into queued candidates/issues. Configuration and instructions: `docs/SUPERVISOR_AUTOMATION.md`.
 
 Design rules:
 - **Everything is resumable from git.** The controller must be killable at any instant; on restart it re-reads the ledger, reconciles any in-flight Harbor job directory (`jobs/<name>/result.json` present → ingest; absent → re-run), and continues.
-- **One writer.** A `results/LOCK` file with agent id + heartbeat timestamp; a second controller exits if the lock is <20 min old.
+- **One loop at a time, two writers.** A `results/LOCK` file with agent id + heartbeat timestamp (refreshed every 10 min); a second controller exits if the lock is <45 min old. The supervisor writes only under `results/meta/**`, `results/SUPERVISOR_LOG.md`, `results/ANSWERS.md`; both agents `git pull --rebase` before every commit.
 - **No task containers on the controller VM.** Local Docker is only for `excalibur doctor` smoke runs of 1–2 tasks, and optional.
 
 ---
@@ -152,7 +158,7 @@ excalibur/
     metrics.py                   # pass rate, tokens/task, cost, wall time; paired deltas + bootstrap
     acceptance.py                # decision rules (§7)
     loop.py                      # funnel + greedy selection + batching (§6, §9)
-    meta_review.py               # bundle builder + `agent -p` invocation + proposal ingestion (§9)
+    meta_review.py               # bundle builder + async proposal ingestion + DeepSeek V4 Pro fallback reviewer (§9)
     report.py                    # LEADERBOARD.md, per-candidate reports, final summary JSON
     budget.py                    # cost tracking + kill switch
     harbor_agent/
@@ -182,15 +188,17 @@ excalibur/
     ledger.jsonl
     LEADERBOARD.md
     candidates/<plugin-id>/report.md
-    meta/<n>/bundle.md, proposals.json
+    meta/<n>/bundle.md, proposals.json   # bundle by controller, proposals by supervisor
+    SUPERVISOR_LOG.md, ANSWERS.md        # written by the supervisor only
     LOCK                         # gitignored
   jobs/                          # harbor job dirs (gitignored; artifacts summarised into results/)
   config.yaml
   .cursor/
     environment.json
     Dockerfile
-    agents/meta-reviewer.md      # optional: Cursor subagent definition for reviews
-    AUTOMATION.md                # instructions text to paste into the Automation
+    AUTOMATION.md                # builder/operator run instructions (§10.4)
+  docs/SUPERVISOR_AUTOMATION.md  # supervisor Automation settings + instructions (§9.2)
+  schemas/proposals.schema.json  # validates supervisor output (§9.3)
 ```
 
 ---
@@ -285,10 +293,14 @@ def run(config):
                 state.requeue_front(others, retest_against=baseline.id)
             else:
                 state.mark(best, "accepted_dev_only"); state.reject(best, "holdout")
-        git_commit_push(state, f"excalibur: batch {state.batch_no} decided")
+        git_pull_rebase(); git_commit_push(state, f"excalibur: batch {state.batch_no} decided")
         if state.candidates_since_review >= config.meta_review_every:
-            proposals = meta_review(state)            # §9
-            state.ingest(proposals); git_commit_push(...)
+            write_review_bundle(state)                # §9.1; supervisor writes proposals later
+            git_commit_push(state, "excalibur: meta-review bundle")
+        for p in state.pending_proposals():           # appeared via supervisor commit (after pull)
+            state.ingest(validate(p)); git_commit_push(state, "excalibur: ingest proposals")
+        if state.review_overdue(hours=3):
+            state.ingest(fallback_review_deepseek_pro(state))   # §9.2 fallback
     write_final_report(state)
 ```
 
@@ -475,16 +487,16 @@ Every `meta_review_every` (default 8; allowed 5–10) *decided* candidates, or o
 - Source of every plugin accepted in the window (for the hack audit).
 - The open questions list from the previous review and what happened to them.
 
-### 9.2 Invocation
-Inside the Cursor VM (the repo is present, so the reviewer can read any file):
+### 9.2 Who reviews, and when
+The reviewer is the **Supervisor Automation**: a Cursor Automation on an hourly cron running the strongest available frontier model against this repo (settings and full instructions in `docs/SUPERVISOR_AUTOMATION.md`). It has repo access, so it reads the bundle, the ledger, and any plugin's source directly — no API keys or CLI authentication inside the controller VM are required.
 
-```bash
-agent -p --force --model "$META_MODEL" --output-format json \
-  --workspace /workspace \
-  "$(cat excalibur/prompts/meta_review.md) $(cat results/meta/$N/bundle.md)"
-```
+Flow (asynchronous by design):
+1. Controller writes `results/meta/<n>/bundle.md`, `git pull --rebase`, commits, pushes, and **continues evaluating**.
+2. Supervisor wakes, finds a bundle without a sibling `proposals.json`, writes it per §9.3, validates JSON, commits under `results/meta/<n>/`, appends to `results/SUPERVISOR_LOG.md`.
+3. Controller, before each batch, `git pull --rebase`; if `proposals.json` appeared, validates it against `schemas/proposals.schema.json` and ingests (§9.4).
+4. Fallback: if no proposals appear within 3 hours, the controller runs the review itself with **DeepSeek V4 Pro** over the DeepSeek API (`deepseek-v4-pro`, max reasoning, JSON enforced by prompt + schema, 2 retries, ~$0.20–0.40, counted against the budget) and records `reviewer: fallback-deepseek-pro`. `agent -p` inside the VM is a last resort only if the Cursor CLI is present and authenticated there.
 
-`META_MODEL` defaults to the strongest model available from `agent --list-models` at run time (the builder should pick a frontier model such as the latest Claude/GPT/Grok tier and record it in the ledger). The reviewer may run read-only commands (`harbor view` API, `jq` over trajectories) but the prompt forbids edits; the controller applies changes.
+The supervisor also acts as **operator** between reviews: if `results/LOCK` is older than 45 minutes and the build is complete, it runs `uv run excalibur resume --max-minutes 40`; if the builder ended its turn with a question, it answers in `results/ANSWERS.md` (and, when `CURSOR_API_KEY` and `EXCALIBUR_BUILDER_AGENT_ID` are set, sends the answer as a follow-up run through the Cloud Agents API); it flags budget or safety problems in its status. It never runs trials, never calls the DeepSeek API for evaluation, and never edits code, config, verdicts, or the ledger.
 
 ### 9.3 Required output (`proposals.json`, schema-validated)
 ```json
@@ -500,7 +512,8 @@ agent -p --force --model "$META_MODEL" --output-format json \
 ```
 
 ### 9.4 What the controller does with it
-- `new_candidates`: scaffold `plugins/<id>` from `_template` with the sketch as `src/index.ts` and manifest filled in; run `static_check`; queue by priority. (Implementation of the sketch into working code is done by a **second headless Cursor call** with a cheaper model: `agent -p --force --model <coder> "implement plugins/<id> per plugin.yaml and sketch; run pnpm typecheck"`, capped at 2 attempts.)
+Ingestion happens at the start of the next batch after a `git pull --rebase` (never mid-batch). Also read `results/ANSWERS.md` when it changes.
+- `new_candidates`: scaffold `plugins/<id>` from `_template` with the sketch as `src/index.ts` and manifest filled in; run `static_check`; queue by priority. (Turning the sketch into working code happens when the idea reaches the front of the queue: if the builder/operator agent is in session it implements it directly; when the loop is running unattended under the supervisor chain, the controller drafts `src/index.ts` from the sketch with DeepSeek V4 Pro over the API, typechecks against the pinned DSH types, retries once with the compiler errors, and excludes the candidate with reason `coder_failed` if it still does not compile. The supervisor never writes code.)
 - `plugin_audits` with `hack`: quarantine (remove from stack, mark ledger, revert to previous stack numbers).
 - `config_changes`: applied automatically **only** for keys whitelisted in `config.yaml: meta_review.auto_apply_keys` (e.g. batch size, bootstrap resamples, timeouts). Anything else is written to `results/meta/<n>/PROPOSED_CHANGES.md` and surfaces in the final report for the human.
 - `system_findings` with severity `high`: controller pauses new batches, commits, and (if `CURSOR_API_KEY` is present) posts a follow-up to the owning Cursor agent run so the human sees it; otherwise continues in "conservative mode" (batch size 1).
@@ -536,8 +549,10 @@ Secrets (Dashboard → Cloud Agents → Secrets): `DEEPSEEK_API_KEY`, `DAYTONA_A
 Alternative considered: run DSH on the controller and point its `fs`/`subprocess` providers at the remote sandbox (DSH's `e2b.cordis.yml` shows this composition). Rejected for v1 — the installed-agent pattern is how every agent on the TB leaderboard is run, keeps the controller light, and isolates candidate bugs inside the sandbox.
 
 ### 10.3 Run modes
-1. **Primary — single long-running Cloud Agent (Ultra/Teams/Enterprise).** Start from cursor.com/agents with the prompt in `.cursor/AUTOMATION.md` ("run `uv run excalibur run` in a tmux session `excalibur-loop`; poll every 10 min; on completion write the final report; never edit results by hand"). The controller commits and pushes after every batch, so a mid-run VM recycle loses ≤ one batch.
-2. **Fallback / heartbeat — Automation on a 30-min cron** with the same repo and instructions: `uv run excalibur resume --max-minutes 25`. `resume` exits immediately if `results/LOCK` is fresh (another controller alive), otherwise reconciles and runs batches until its time box expires, committing as it goes. This turns the overnight run into a chain of short agents if long-running agents are unavailable.
+Two Cursor agents share the repo; the ledger and lock keep them from colliding.
+
+1. **Builder/operator — one Cloud Agent session** started from `docs/KICKOFF_PROMPT.md` (long-running agents on Ultra/Teams/Enterprise; on other plans, run the same prompt from a local Cursor agent). Builds M0–M6, then runs the pilot loop in a tmux session, committing after every milestone and every decided batch, so a mid-run VM recycle loses at most one batch.
+2. **Supervisor — a Cursor Automation on an hourly cron** (`docs/SUPERVISOR_AUTOMATION.md`). Reviews, restarts, answers, and flags as described in §9.2. Once M6 is done the supervisor alone can keep the loop alive: `excalibur resume` is idempotent, lock-aware, and time-boxed, so a chain of supervisor wakes is a valid way to run the whole campaign if the builder session ends.
 3. **Self-hosted worker (optional).** Point a Cursor self-hosted worker pool at a beefier machine if Daytona is not wanted; then `--env docker` with `-n 16` becomes viable. Not needed for the default design.
 
 ### 10.4 Agent instructions (`.cursor/AUTOMATION.md`, also used as the run prompt)
@@ -581,8 +596,8 @@ Alternative considered: run DSH on the controller and point its `fs`/`subprocess
 | M2 | `calibrate` (full 89×3 default-stack run, split selection, A/A null runs) **or, under `profile: pilot`, `calibrate --seeded`**: hard split seeded from public per-task rewards, verified with dev×3 (§6.6) | dev baseline in 0.10–0.40; A/A false-accept rate < 10% under §7.2 (pilot: verified baseline recorded, thresholds from §6.6) |
 | M3 | Ledger, catalog, static checks, `_template` plugin, **`queue import` of `candidates/seed_queue.yaml`** (vendor community plugins at pinned commits, copy remixes, generate manifests, run static checks) | `excalibur eval --candidate dsh-plan-mode --stage screen` runs and appends events; import report lists queued/excluded counts with reasons |
 | M4 | Funnel + greedy batch loop + rebaseline + commit/push | `excalibur run --max-candidates 8` completes unattended; `resume` after `kill -9` continues correctly |
-| M5 | Meta-review bundle, `agent -p` invocation, proposal ingestion, scaffold + coder call | A review produces ≥1 queued candidate that passes static_check |
-| M6 | Reports, budget kill-switch, Automation instructions, incident capture | LEADERBOARD regenerates; budget cap halts run; Automation resumes a killed run |
+| M5 | Meta-review bundle writer, `schemas/proposals.schema.json`, async ingestion on pull, DeepSeek V4 Pro fallback reviewer, scaffold + coder call | A hand-written `proposals.json` dropped into `results/meta/0/` is ingested on the next batch and produces ≥1 queued candidate that passes static_check; the fallback reviewer produces schema-valid JSON on a fixture bundle |
+| M6 | Reports, budget kill-switch, lock refresh/`resume` from a fresh VM, incident capture | LEADERBOARD regenerates; budget cap halts run; after `kill -9`, `uv run excalibur resume --max-minutes 5` on a clean checkout with only the secrets continues correctly (this is what the supervisor runs) |
 | M7 | **Pilot run (§6.6)** with the 20 `pilot: true` candidates under `profile: pilot`, cap $18 | Report with accepted/rejected tables, cumulative-gain curve, and measured $/trial, tokens/trial, wall/trial written to the ledger; full-campaign cost re-projected from measured numbers |
 
 Testing guidance for the implementer: unit-test `metrics.py`/`acceptance.py` with synthetic per-task arrays (including the A/A case); test `ledger.py` replay with fixture logs; mock Harbor in `loop.py` tests; only M1/M2/M7 need real spend.
@@ -598,18 +613,19 @@ Testing guidance for the implementer: unit-test `metrics.py`/`acceptance.py` wit
 | Noise produces false accepts | Paired design, 3-trial confirm, bootstrap gate, A/A-calibrated thresholds, holdout confirmation, periodic 5-trial re-baseline |
 | Benchmark hacking by generated plugins | §8: static scan, sealed holdout, canary, meta audit, generality rule |
 | Cost runaway | Budget kill-switch, per-trial/job/batch caps, funnel, `-n` backoff on 429 |
-| Cursor VM recycled mid-run | Ledger in git after every batch; `resume` reconciles Harbor job dirs; Automation heartbeat |
+| Cursor VM recycled mid-run | Ledger in git after every batch; `resume` reconciles Harbor job dirs; supervisor restarts on stale lock |
 | Daytona quota/concurrency | Configurable `-n`; controller halves `-n` on provisioning errors; `--env modal`/`e2b` are drop-in alternatives |
 | DeepSeek rate limits / peak pricing | Backoff; schedule runs in off-peak window; cache-friendly prompt ordering |
 | Meta-reviewer proposes harmful config changes | Whitelisted auto-apply keys only; rest goes to human report |
+| Builder and supervisor commit conflicts | Disjoint write sets; `git pull --rebase` before every commit; supervisor aborts on conflict and retries next wake |
 | Task network drift (TB 2.0 lesson) | Use 2.1; exclude tasks that fail oracle at calibration; re-check oracle monthly |
 
 ---
 
 ## 14. Assumptions and open decisions (for the human)
 1. Sandboxes: Daytona is assumed (Harbor-supported, $0.05/vCPU-h, $200 free credit). Swap to Modal/E2B by changing `evaluator.env` — nothing else depends on it.
-2. Meta-review model: chosen at runtime from `agent --list-models`; record the choice. If the account lacks a frontier model, the loop still runs; reviews degrade.
-3. Long-running agents require Ultra/Teams/Enterprise; on Pro use the 30-min Automation chain (§10.3.2).
+2. Meta-review model: whichever frontier model the Supervisor Automation is configured with; the supervisor records it in `results/SUPERVISOR_LOG.md`. If the Automation is not created, reviews fall back to DeepSeek V4 Pro (§9.2) and nothing restarts a stalled loop except the human.
+3. Long-running agents require Ultra/Teams/Enterprise; on other plans run the builder locally and let the hourly supervisor keep the loop alive once M6 is done (§10.3).
 4. Terminal-Bench 2.1 is the v1 benchmark. Adding a second benchmark (e.g. an Agents' Last Exam near-term subset) as a *canary* is the recommended next step once the loop is stable.
 5. Acceptance thresholds (+3 pp / −15% cost / p ≤ 0.10) are starting points to be validated by the A/A runs; the meta-reviewer may propose changes but cannot auto-apply them.
 
@@ -720,7 +736,7 @@ class DshAgent(BaseInstalledAgent):
         ...
 ```
 
-## Appendix D — Meta-review prompt (`excalibur/prompts/meta_review.md`, abridged)
+## Appendix D — Meta-review prompt (used by the supervisor per `docs/SUPERVISOR_AUTOMATION.md`, and by the DeepSeek V4 Pro fallback in `excalibur/prompts/meta_review.md`; abridged)
 ```
 You are the meta-reviewer for Excalibur, an autonomous loop that tests DeepSeek Harness plugins
 on a Terminal-Bench 2.1 subset with DeepSeek V4 Flash. You may read any file in this repo and run
