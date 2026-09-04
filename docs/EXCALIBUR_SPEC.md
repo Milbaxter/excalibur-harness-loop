@@ -14,11 +14,11 @@ Status: v1 spec, ready to implement. Written for an implementing model (e.g. Gro
 | **Benchmark** | **Terminal-Bench 2.1** (89 Docker tasks) run through **Harbor**, restricted to a calibrated **hard "dev" subset (~30 tasks)** on which the baseline scores 10–40%, plus a **held-out subset (~15 tasks)** used only to confirm accepted plugins. |
 | **Sandboxes** | **Daytona** cloud sandboxes via Harbor `--env daytona` (trials are I/O-bound, so 60–120 concurrent trials). The Cursor VM never runs task containers. |
 | **Controller** | A Python CLI (`excalibur`) in this repo, built and operated by a **Cursor Cloud Agent** (the *builder*), with all state in the git-committed ledger so any agent can resume it. |
-| **Supervisor / meta-reviewer** | A **Cursor Automation** (hourly cron, strongest available model) wakes, reads the ledger, and: writes `proposals.json` for any pending review bundle (every N=8 decided candidates the controller writes one), restarts a stalled loop, answers the builder's questions, flags budget/safety issues. Reviews are asynchronous; DeepSeek V4 Pro is the fallback reviewer. See §9 and `docs/SUPERVISOR_AUTOMATION.md`. |
+| **Supervisor / meta-reviewer** | A **Cursor Automation** (hourly cron, strongest available model) wakes, reads the ledger, and: writes `proposals.json` for any pending review bundle (every N=8 decided candidates the controller writes one), repairs controller crashes (bounded to `excalibur/` with tests), restarts a stalled loop, answers the builder's questions, ensures `results/FINAL_REPORT.md` exists, flags budget/safety issues. Reviews are asynchronous; DeepSeek V4 Pro is the fallback reviewer. See §9 and `docs/SUPERVISOR_AUTOMATION.md`. |
 | **Metrics** | Pass rate (mean reward), **billed tokens/task**, USD/task, wall time/task. Acceptance requires a paired improvement on the dev set, confirmation on hold-out, and a token budget constraint (§7). |
 | **Anti-hacking** | Static scan of plugin source, sealed hold-out, cross-distribution canary tasks, meta-review audit, and the rule that a plugin must be describable without reference to any task (§8). |
 | **Budget (overnight)** | ~100 candidates in ~8–10 h. Cost is driven by trial volume (~4.5–7k agentic rollouts × ~1.5M mostly-cached prompt tokens each), not the per-token price: **≈ $300–550 lean, $450–750 standard** *(est., §6.5)*. DeepSeek tokens ≈ 60%, Daytona ≈ 20%, meta-review ≈ 10%. Achieved via three-stage funnel (smoke → screen → confirm) and evaluating 4 candidates in parallel. |
-| **Output** | `results/LEADERBOARD.md` + `results/ledger.jsonl`: which plugins were accepted, Δ pass-rate, Δ tokens/task, Δ cost, with confidence intervals; final accepted stack as a reproducible `dsh` profile. |
+| **Output** | `results/FINAL_REPORT.md` (template §7.5) + `results/LEADERBOARD.md` + `results/ledger.jsonl`: every candidate's verdict with Δ pass-rate, Δ tokens/task, Δ cost and confidence intervals; measured $/trial; the accepted stack as a reproducible `dsh` profile; recommendations for the next campaign. |
 
 ---
 
@@ -136,8 +136,10 @@ Components:
 
 Design rules:
 - **Everything is resumable from git.** The controller must be killable at any instant; on restart it re-reads the ledger, reconciles any in-flight Harbor job directory (`jobs/<name>/result.json` present → ingest; absent → re-run), and continues.
-- **One loop at a time, two writers.** A `results/LOCK` file with agent id + heartbeat timestamp (refreshed every 10 min); a second controller exits if the lock is <45 min old. The supervisor writes only under `results/meta/**`, `results/SUPERVISOR_LOG.md`, `results/ANSWERS.md`; both agents `git pull --rebase` before every commit.
+- **One loop at a time, two writers.** A `results/LOCK` file with agent id + heartbeat timestamp (refreshed every 10 min); a second controller exits if the lock is <45 min old. The supervisor writes under `results/meta/**`, `results/SUPERVISOR_LOG.md`, `results/ANSWERS.md`, and may make bounded bug fixes to controller code (`excalibur/`, `tests/`, `scripts/`, `.cursor/install.sh`) with tests; it never touches plugins, the baseline, splits, thresholds, the ledger, or verdicts. Both agents `git pull --rebase` before every commit.
 - **No task containers on the controller VM.** Local Docker is only for `excalibur doctor` smoke runs of 1–2 tasks, and optional.
+- **Crashes leave evidence.** Any uncaught exception in the controller writes `results/incidents/<ts>.md` (traceback, command, ledger tail), commits it, and exits non-zero. That file is the supervisor's repair signal (§9.2).
+- **Hand edits are scoped.** Humans and agents may hand-write `results/milestones/*.md`, `results/incidents/*.md`, and (supervisor only) `results/meta/**`, `SUPERVISOR_LOG.md`, `ANSWERS.md`. The ledger, verdicts, splits, and `LEADERBOARD.md` are written only by controller code.
 
 ---
 
@@ -190,13 +192,17 @@ excalibur/
     candidates/<plugin-id>/report.md
     meta/<n>/bundle.md, proposals.json   # bundle by controller, proposals by supervisor
     SUPERVISOR_LOG.md, ANSWERS.md        # written by the supervisor only
+    FINAL_REPORT.md                      # §7.5; written by `excalibur report` at the end of the campaign
+    milestones/M<n>.md, incidents/<ts>.md # hand-written evidence / crash reports
     LOCK                         # gitignored
   jobs/                          # harbor job dirs (gitignored; artifacts summarised into results/)
   config.yaml
   .cursor/
     environment.json
     Dockerfile
-    AUTOMATION.md                # builder/operator run instructions (§10.4)
+    install.sh                   # starter install (uv, harbor, node 22); builder extends in M0
+    OPERATOR.md                  # builder/operator run instructions (§10.4)
+  AGENTS.md                      # auto-read by Cursor agents: role selection + binding constraints
   docs/SUPERVISOR_AUTOMATION.md  # supervisor Automation settings + instructions (§9.2)
   schemas/proposals.schema.json  # validates supervisor output (§9.3)
 ```
@@ -345,7 +351,7 @@ For perspective, the same campaign with a frontier model at $15–75 per 1M outp
 
 **Build and run this profile first.** It validates the pipeline end to end, measures the real $/trial (replacing every *(est.)* above), and tests 15–20 candidates with enough power to detect large effects. Only after a successful pilot should the `lean`/`standard` campaign be funded.
 
-Cost assumptions: Daytona's **$200 sign-up credit (no card)** covers all sandbox compute; meta-review runs through the Cursor CLI on the Cursor plan (or DeepSeek V4 Pro at ~$0.20 per review); therefore the $20 is DeepSeek Flash tokens only.
+Cost assumptions: Daytona's **$200 sign-up credit (no card)** covers all sandbox compute; meta-review is done by the Supervisor Automation on the Cursor plan (fallback: DeepSeek V4 Pro at ~$0.20–0.40 per review); therefore the $20 is DeepSeek Flash tokens only.
 
 | knob | pilot value | why |
 |---|---|---|
@@ -408,6 +414,21 @@ Otherwise reject with reason `confirm_no_gain`, `confirm_too_expensive`, or `con
 | # | Plugin | Status | Δpass dev (95% CI) | Δtokens/task | Δcost/task | Δwall | Holdout Δ | Stack pass after |
 ```
 plus a cumulative-gain chart as an ASCII/Markdown table of stack pass rate and cost after each acceptance, and a "rejected" table with reason codes. Per-candidate `report.md` contains: manifest, effective `--dump-config` diff, per-task table, 3 worst regressions and 3 best gains with links to `jobs/<job>/<trial>/agent/trajectory.json`.
+
+### 7.5 Final report (`results/FINAL_REPORT.md`) — the campaign's deliverable
+Written by `excalibur report --final` when the queue is empty, the candidate cap is reached, or the budget cap fires; the supervisor writes it from the ledger if the controller never did (safety net). Sections, in order, all mandatory:
+
+1. **Headline** — one paragraph: baseline pass rate on dev, final stack pass rate on dev and holdout, number of candidates decided/accepted/rejected/`accepted_dev_only`/excluded, total spend vs cap, wall time.
+2. **Every candidate** — one table row per candidate in queue order (including excluded and never-reached ones): id, kind (control/community/remix/idea), status, stage reached, Δpass dev (pp, 95% CI), Δbilled tokens/task (%), Δcost/task (%), holdout Δ, reason code, link to `results/candidates/<id>/report.md`.
+3. **Accepted stack** — ordered list of accepted plugins with the cumulative-gain table (stack pass and cost after each acceptance) and the exact `harness/patches/<stack-id>.yml` needed to reproduce it.
+4. **Positive controls** — did the DSH built-in rows behave as expected? If not, the diagnosis (pipeline, split, noise, or plugin).
+5. **Measured economics** — $/trial, billed tokens/trial, wall/trial (median and p90), Daytona minutes, meta-review costs; re-projected cost for a 100-candidate `lean` campaign using these numbers.
+6. **Meta-reviews** — for each review: reviewer, findings acted on, candidates queued, hack audits, questions still open.
+7. **Incidents and repairs** — every `results/incidents/*` with what fixed it and by whom (builder/supervisor).
+8. **Spec deltas** — what turned out wrong or underspecified, with the recommended change (this feeds the next campaign).
+9. **Next steps** — the ordered queue that remains, and the recommended budget for the next run.
+
+All numbers must be derivable from `results/ledger.jsonl`; the report cites ledger event counts so the supervisor can cross-check it.
 
 ---
 
@@ -496,7 +517,7 @@ Flow (asynchronous by design):
 3. Controller, before each batch, `git pull --rebase`; if `proposals.json` appeared, validates it against `schemas/proposals.schema.json` and ingests (§9.4).
 4. Fallback: if no proposals appear within 3 hours, the controller runs the review itself with **DeepSeek V4 Pro** over the DeepSeek API (`deepseek-v4-pro`, max reasoning, JSON enforced by prompt + schema, 2 retries, ~$0.20–0.40, counted against the budget) and records `reviewer: fallback-deepseek-pro`. `agent -p` inside the VM is a last resort only if the Cursor CLI is present and authenticated there.
 
-The supervisor also acts as **operator** between reviews: if `results/LOCK` is older than 45 minutes and the build is complete, it runs `uv run excalibur resume --max-minutes 40`; if the builder ended its turn with a question, it answers in `results/ANSWERS.md` (and, when `CURSOR_API_KEY` and `EXCALIBUR_BUILDER_AGENT_ID` are set, sends the answer as a follow-up run through the Cloud Agents API); it flags budget or safety problems in its status. It never runs trials, never calls the DeepSeek API for evaluation, and never edits code, config, verdicts, or the ledger.
+The supervisor also acts as **repair engineer and operator** between reviews: when a `results/incidents/*.md` crash report appears (or a traceback is in the last milestone file), it diagnoses, fixes the controller bug minimally under `excalibur/`/`scripts/`/`tests/` with a regression test and green `pytest`, commits `supervisor: fix …`, and restarts the loop; it never "fixes" a failure by changing acceptance thresholds, splits, budget caps, plugin code, or the baseline, and it hands external causes (quota, outage, missing secret) to the human via `results/ANSWERS.md`. If `results/LOCK` is older than 45 minutes and the build is complete, it runs `uv run excalibur resume --max-minutes 40`; if the builder ended its turn with a question, it answers in `results/ANSWERS.md` (and, when `CURSOR_API_KEY` and `EXCALIBUR_BUILDER_AGENT_ID` are set, sends the answer as a follow-up run through the Cloud Agents API); it flags budget or safety problems in its status; and if the pilot has finished without `results/FINAL_REPORT.md`, it produces it (§7.5). It never runs trials, never calls the DeepSeek API for evaluation, and never edits plugins, the baseline, splits, thresholds, verdicts, or the ledger.
 
 ### 9.3 Required output (`proposals.json`, schema-validated)
 ```json
@@ -528,20 +549,20 @@ Ingestion happens at the start of the next batch after a `git pull --rebase` (ne
 ```json
 {
   "build": { "dockerfile": ".cursor/Dockerfile", "context": ".." },
-  "install": "uv sync && uv tool install harbor && uv tool install daytona && pnpm --dir harness install && bash scripts/cache-dsh-tarball.sh",
+  "install": "bash .cursor/install.sh && uv sync && bash scripts/cache-dsh-tarball.sh",
   "start": "mkdir -p /tmp/excalibur && echo started > /tmp/excalibur/start.ok",
   "terminals": []
 }
 ```
-`.cursor/Dockerfile` (Ubuntu 24.04 base): Node 22 + pnpm, Python 3.12 + `uv`, `jq`, `zstd`, `git`. No Docker daemon required (Daytona does sandboxing). Optional DinD only if `EXCALIBUR_LOCAL_DOCKER=1`.
+A starter `.cursor/environment.json` + `.cursor/install.sh` ship in the repo (uv, Python 3.12, Harbor, static Node 22, zstd/jq) so the first VM boots ready; M0 extends it. Harbor's Daytona backend needs the Daytona Python SDK — install whatever `harbor run --env daytona` reports missing and pin it. No Docker daemon required. Optional DinD only if `EXCALIBUR_LOCAL_DOCKER=1`.
 
-`scripts/cache-dsh-tarball.sh` runs `npm pack @deepseek-ai/dsh@$(cat harness/dsh.version)` and stores the tarball + the `excalibur-base` bundle in `harness/dist/` so each sandbox install is a single `npm i -g ./dsh.tgz` (~20–40 s) instead of a registry fetch. Also pre-generate the per-stack patch files.
+`scripts/cache-dsh-tarball.sh` builds `harness/dist/excalibur-runtime.tar.zst`: static Node 22, the pinned `@deepseek-ai/dsh` **with dependencies installed**, and the `excalibur` profile (base bundle + vendored plugins with their `node_modules`). Each sandbox install is one upload + one `tar` extract (~10–30 s) and needs no network. Also pre-generate the per-stack patch files.
 
 Secrets (Dashboard → Cloud Agents → Secrets): `DEEPSEEK_API_KEY`, `DAYTONA_API_KEY`, optional `DAYTONA_API_URL`, optional `CURSOR_API_KEY` (only for API follow-ups), `EXCALIBUR_BUDGET_USD`.
 
 ### 10.2 Harbor agent adapter (core of the evaluator)
 `excalibur/harbor_agent/dsh_agent.py` extends `BaseInstalledAgent`:
-- `_install_agent_template_path` → `install-dsh.sh.j2`: installs Node 22 if missing (nodesource or prebuilt tarball), `npm i -g /tmp/dsh.tgz`, writes `$DSH_HOME` (e.g. `/tmp/dsh-home`) with profile `excalibur` = `excalibur-base` bundle + accepted plugins + candidate (copied in via Harbor `upload`), sets `DSH_TELEMETRY=off`.
+- `_install_agent_template_path` → `install-dsh.sh.j2`: unpacks the **self-contained runtime bundle** uploaded via Harbor (static Node 22 + pinned `dsh` with its `node_modules` + the `excalibur` profile with accepted plugins and candidate already installed; see builder notes §1 — no network inside the container), sets `PATH`, `DSH_HOME=/opt/excalibur/dsh-home`, `DSH_TELEMETRY=off`.
 - `create_run_agent_commands(instruction)` → one `ExecInput`: `cd /app && dsh --profile excalibur --patch /tmp/stack.patch.yml "<instruction>"` with `env={DEEPSEEK_API_KEY, DSH_HOME}` and a hard `timeout 900`.
 - After run: copy `$DSH_HOME/sessions` to the agent output dir (Harbor artifact collection) and convert the DSH session log to **ATIF** `trajectory.json` (steps = user/assistant/tool events; `final_metrics.total_prompt_tokens/total_completion_tokens/total_cached_tokens/total_cost_usd`). Set `SUPPORTS_ATIF = True` so `harbor view` shows tokens.
 - Prompt template: pass the instruction verbatim; do **not** add benchmark-specific hints (generality rule applies to the adapter too). The only allowed wrapper is the neutral "You are working in `/app`; finish by ensuring the task is complete" line, kept identical for all candidates.
@@ -551,20 +572,20 @@ Alternative considered: run DSH on the controller and point its `fs`/`subprocess
 ### 10.3 Run modes
 Two Cursor agents share the repo; the ledger and lock keep them from colliding.
 
-1. **Builder/operator — one Cloud Agent session** started from `docs/KICKOFF_PROMPT.md` (long-running agents on Ultra/Teams/Enterprise; on other plans, run the same prompt from a local Cursor agent). Builds M0–M6, then runs the pilot loop in a tmux session, committing after every milestone and every decided batch, so a mid-run VM recycle loses at most one batch.
+1. **Builder/operator — one Cloud Agent session** started from `AGENTS.md` / `docs/KICKOFF_PROMPT.md` (long-running agents on Ultra/Teams/Enterprise; on other plans, run the same prompt from a local Cursor agent). Builds M0–M6, then runs the pilot loop in a tmux session, committing after every milestone and every decided batch, so a mid-run VM recycle loses at most one batch.
 2. **Supervisor — a Cursor Automation on an hourly cron** (`docs/SUPERVISOR_AUTOMATION.md`). Reviews, restarts, answers, and flags as described in §9.2. Once M6 is done the supervisor alone can keep the loop alive: `excalibur resume` is idempotent, lock-aware, and time-boxed, so a chain of supervisor wakes is a valid way to run the whole campaign if the builder session ends.
 3. **Self-hosted worker (optional).** Point a Cursor self-hosted worker pool at a beefier machine if Daytona is not wanted; then `--env docker` with `-n 16` becomes viable. Not needed for the default design.
 
-### 10.4 Agent instructions (`.cursor/AUTOMATION.md`, also used as the run prompt)
-- You are the operator, not the experimenter: never hand-edit `results/`, `benchmarks/`, or plugin verdicts.
+### 10.4 Operator instructions (`.cursor/OPERATOR.md`, also used as the run prompt)
+- You are the operator, not the experimenter: never hand-edit the ledger, `LEADERBOARD.md`, `benchmarks/`, or plugin verdicts. Milestone and incident files are yours to write.
 - Start/resume the loop (`uv run excalibur resume --max-minutes <N>`), watch `results/ledger.jsonl` tail and `jobs/*/job.log`.
 - If the controller crashes: capture the traceback into `results/incidents/<ts>.md`, fix **controller** bugs only if obvious and covered by tests, otherwise commit the incident and exit.
-- On finish: run `uv run excalibur report`, commit, push, and summarise `results/LEADERBOARD.md` in your final message.
+- On finish: run `uv run excalibur report --final`, confirm `results/FINAL_REPORT.md` has every §7.5 section, commit, push, and summarise it in your final message.
 
 ### 10.5 Budget and kill-switch
 - `budget.py` tracks spend from ATIF costs + Daytona usage (sandbox-seconds × vCPU/GiB prices) and refuses to start a new batch if projected spend > `EXCALIBUR_BUDGET_USD`. Default $500.
 - Hard caps: per-trial 15 min; per-Harbor-job 45 min; per-batch 75 min; DeepSeek 429/5xx → exponential backoff with `-n` halved for the next job.
-- `excalibur budget` prints spend so far; the Automation prompt tells the agent to stop the loop if it exceeds the cap.
+- `excalibur budget` prints spend so far; the operator instructions tell the agent to stop the loop if it exceeds the cap.
 
 ---
 
@@ -597,7 +618,7 @@ Two Cursor agents share the repo; the ledger and lock keep them from colliding.
 | M3 | Ledger, catalog, static checks, `_template` plugin, **`queue import` of `candidates/seed_queue.yaml`** (vendor community plugins at pinned commits, copy remixes, generate manifests, run static checks) | `excalibur eval --candidate dsh-plan-mode --stage screen` runs and appends events; import report lists queued/excluded counts with reasons |
 | M4 | Funnel + greedy batch loop + rebaseline + commit/push | `excalibur run --max-candidates 8` completes unattended; `resume` after `kill -9` continues correctly |
 | M5 | Meta-review bundle writer, `schemas/proposals.schema.json`, async ingestion on pull, DeepSeek V4 Pro fallback reviewer, scaffold + coder call | A hand-written `proposals.json` dropped into `results/meta/0/` is ingested on the next batch and produces ≥1 queued candidate that passes static_check; the fallback reviewer produces schema-valid JSON on a fixture bundle |
-| M6 | Reports, budget kill-switch, lock refresh/`resume` from a fresh VM, incident capture | LEADERBOARD regenerates; budget cap halts run; after `kill -9`, `uv run excalibur resume --max-minutes 5` on a clean checkout with only the secrets continues correctly (this is what the supervisor runs) |
+| M6 | `report --final` (§7.5), budget kill-switch, lock refresh/`resume` from a fresh VM, incident capture (`results/incidents/<ts>.md` on any uncaught exception, committed before exit) | LEADERBOARD and a FINAL_REPORT with all nine §7.5 sections regenerate from a fixture ledger; budget cap halts run; an injected exception produces a committed incident file; after `kill -9`, `uv run excalibur resume --max-minutes 5` on a clean checkout with only the secrets continues correctly (this is what the supervisor runs) |
 | M7 | **Pilot run (§6.6)** with the 20 `pilot: true` candidates under `profile: pilot`, cap $18 | Report with accepted/rejected tables, cumulative-gain curve, and measured $/trial, tokens/trial, wall/trial written to the ledger; full-campaign cost re-projected from measured numbers |
 
 Testing guidance for the implementer: unit-test `metrics.py`/`acceptance.py` with synthetic per-task arrays (including the A/A case); test `ledger.py` replay with fixture logs; mock Harbor in `loop.py` tests; only M1/M2/M7 need real spend.
@@ -764,7 +785,7 @@ uv run excalibur run                          # full loop until queue empty or b
 uv run excalibur resume --max-minutes 25      # time-boxed, lock-aware (Automation mode)
 uv run excalibur eval --candidate <id> --stage confirm --against stack-0003
 uv run excalibur review --now                 # force a meta-review
-uv run excalibur report                       # regenerate LEADERBOARD.md and final JSON
+uv run excalibur report [--final]             # regenerate LEADERBOARD.md; --final also writes FINAL_REPORT.md (§7.5)
 uv run excalibur budget                       # spend so far vs cap
 harbor view jobs                              # human inspection of trajectories (local)
 ```
