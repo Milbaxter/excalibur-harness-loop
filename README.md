@@ -11,6 +11,7 @@ meant to be built from it by a coding agent inside Cursor.
 - Spec: [`docs/EXCALIBUR_SPEC.md`](docs/EXCALIBUR_SPEC.md)
 - Kickoff prompt for the building agent: [`docs/KICKOFF_PROMPT.md`](docs/KICKOFF_PROMPT.md)
 - Builder notes (known weak spots + fallbacks): [`docs/BUILDER_NOTES.md`](docs/BUILDER_NOTES.md)
+- Supervisor Automation (scheduled Cursor agent that reviews, unblocks, restarts): [`docs/SUPERVISOR_AUTOMATION.md`](docs/SUPERVISOR_AUTOMATION.md)
 - Candidate pool (163 entries imported from dsh-intelligence-lab, 20 marked for the pilot): [`candidates/`](candidates/README.md)
 
 ## What the spec covers

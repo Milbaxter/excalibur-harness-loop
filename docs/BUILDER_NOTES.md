@@ -48,12 +48,31 @@ If the verified dev baseline is above 0.40 even on the hardest 12: switch `excal
 minimal composition (persona + bash + fs read/write only) per spec §5.4 step 4. If it is 0.00 on all
 12 (nothing solvable): swap the 6 hardest for the next 6 easiest from the probe.
 
-## 4. Meta-review model access inside the Cursor cloud VM
+## 4. Meta-review is asynchronous; the primary reviewer is a scheduled Cursor agent
 
-Try `agent --list-models` first. If the Cursor CLI is missing or unauthenticated in the VM, use
-DeepSeek V4 Pro through the DeepSeek API as the meta-reviewer (`model: deepseek-v4-pro`,
-`reasoningEffort: max`, JSON output enforced by the prompt + schema validation, 2 retries). Cost
-~$0.20–0.40 per review; count it against the budget. Record the model actually used in the ledger.
+This overrides spec §9.2. A **Supervisor Automation** (see `docs/SUPERVISOR_AUTOMATION.md`) wakes
+hourly, finds any `results/meta/<n>/bundle.md` without a `proposals.json`, writes the proposals, and
+commits. The controller must therefore:
+
+1. At review time: write `results/meta/<n>/bundle.md` (spec §9.1), `git pull --rebase`, commit, push,
+   and **continue with the next batch**. Do not block.
+2. Before every batch: `git pull --rebase origin main`; if `results/meta/<n>/proposals.json` has
+   appeared, validate against `schemas/proposals.schema.json` (create this schema in M5 from the shape
+   in spec §9.3) and ingest per §9.4. Also read `results/ANSWERS.md` if it changed — the supervisor may
+   have answered a question you asked.
+3. Fallback: if no `proposals.json` appears within 3 hours, run the review yourself with DeepSeek V4
+   Pro over the DeepSeek API (`deepseek-v4-pro`, max reasoning, JSON enforced by prompt + schema, 2
+   retries, ~$0.20–0.40, counted against the budget) and record `reviewer: fallback-deepseek-pro` in
+   the ledger. `agent -p` inside the VM is a second fallback only if the Cursor CLI is present and
+   authenticated.
+4. Lock discipline: refresh `results/LOCK` (write agent id + ISO timestamp) every 10 minutes while the
+   loop runs; delete it on clean exit. The supervisor treats a lock older than 45 minutes as a stall
+   and may run `excalibur resume` itself once M6 is done, so `resume` must be safe to invoke from a
+   fresh VM with nothing but the repo and the secrets.
+5. Git discipline: `git pull --rebase origin main` before every commit. The supervisor only writes
+   under `results/meta/**`, `results/SUPERVISOR_LOG.md`, `results/ANSWERS.md`; never write there
+   except to ingest.
+
 Never use V4 Pro or any non-Flash model for evaluation trials.
 
 ## 5. Session length and interruptions

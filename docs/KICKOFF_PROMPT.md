@@ -8,9 +8,14 @@
    - `DEEPSEEK_API_KEY`
    - `DAYTONA_API_KEY`
    - `EXCALIBUR_BUDGET_USD` = `18`
-4. Start a Cloud Agent on this repo (branch `main`) with the building model and paste the prompt below.
+4. Create the **Supervisor Automation** (hourly schedule, strongest model) following
+   `docs/SUPERVISOR_AUTOMATION.md`. It does the meta-reviews, restarts a stalled loop, and answers
+   the builder's questions while you sleep.
+5. Start a Cloud Agent on this repo (branch `main`) with the building model and paste the prompt below.
    If long-running agents are not available on your plan, run the same prompt from a local Cursor
-   agent on your machine instead; the pilot takes roughly 2–4 hours.
+   agent on your machine instead; the pilot takes roughly 2–4 hours. Optionally copy the builder
+   agent's `bc-...` id into the `EXCALIBUR_BUILDER_AGENT_ID` secret so the supervisor can send it
+   follow-ups.
 
 ## Prompt to paste
 
@@ -62,9 +67,9 @@ CANDIDATES
 
 PILOT (M7) SPECIFICS
 - Queue: exactly the 20 entries with pilot: true, in their `order`. Do not add others.
-- Trigger one meta-review after 8 decided candidates using `agent -p` with the strongest model from
-  `agent --list-models`; ingest proposals per §9.4 but do NOT auto-implement new candidates in the
-  pilot (queue them only).
+- Trigger one meta-review after 8 decided candidates: write results/meta/1/bundle.md, commit, push,
+  and keep going; the Supervisor Automation writes proposals.json (builder notes §4 has the fallback).
+  Ingest proposals per §9.4 but do NOT auto-implement new candidates in the pilot (queue them only).
 - Stop when the queue is empty, the budget cap fires, or 20 candidates are decided.
 
 FINAL REPORT (your last message)
@@ -81,7 +86,8 @@ Start with M0 now.
 - Watch `results/ledger.jsonl` and `results/milestones/` in the repo; every decision is committed.
 - Check DeepSeek spend in the DeepSeek dashboard once or twice; the in-repo `budget.py` estimate is
   derived from token counts and can drift a few percent from the invoice.
-- If the agent stops with a question, answer it in the same conversation; it resumes from the ledger.
+- If the agent stops with a question, the supervisor will try to answer it on its next wake (see
+  results/ANSWERS.md); otherwise answer it in the same conversation. It resumes from the ledger.
 
 ## After the pilot
 
