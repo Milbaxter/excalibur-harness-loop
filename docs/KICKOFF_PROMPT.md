@@ -1,0 +1,88 @@
+# Kickoff: build and run the Excalibur pilot
+
+## Human pre-flight (do this first)
+
+1. DeepSeek: top up ~$20 at platform.deepseek.com and create an API key.
+2. Daytona: sign up at daytona.io (free $200 credit, no card) and create an API key.
+3. Cursor Dashboard → Cloud Agents → Secrets, add:
+   - `DEEPSEEK_API_KEY`
+   - `DAYTONA_API_KEY`
+   - `EXCALIBUR_BUDGET_USD` = `18`
+4. Start a Cloud Agent on this repo (branch `main`) with the building model and paste the prompt below.
+   If long-running agents are not available on your plan, run the same prompt from a local Cursor
+   agent on your machine instead; the pilot takes roughly 2–4 hours.
+
+## Prompt to paste
+
+```
+You are building and then running Excalibur, an autonomous plugin-evaluation loop for DeepSeek Harness.
+The complete technical specification is in docs/EXCALIBUR_SPEC.md. Read it fully before doing anything.
+Your job is to implement it milestone by milestone (M0 → M7, §12) and then execute the PILOT run (§6.6).
+
+HARD CONSTRAINTS
+- Budget: total DeepSeek spend for this whole session must stay under $18. Implement budget.py early
+  (M0) and make every live-model call go through it. No live model calls before `excalibur doctor` is
+  green. First live spend (M1) is a single task, ≤ $1. Before starting M7, project the pilot cost from
+  measured $/trial and abort if projected > $16.
+- Use profile: pilot for everything (config.yaml). Do NOT run the full 89-task calibration (§5.4); use
+  the seeded hard split procedure in §6.6.
+- Pin exact versions: @deepseek-ai/dsh (write to harness/dsh.version), harbor, the terminal-bench
+  dataset version, Node 22, Python 3.12. Never upgrade mid-session.
+- Never hand-edit results/, benchmarks/*.txt, or plugin verdicts. The ledger is the only state.
+- Sandboxes run in Daytona via Harbor (--env daytona). Do not try to run task containers on this VM.
+- Secrets are available as env vars: DEEPSEEK_API_KEY, DAYTONA_API_KEY, EXCALIBUR_BUDGET_USD. If any is
+  missing, stop and say exactly which one; do not work around it.
+
+WORKING RULES
+- Commit and push after every milestone (and after every decided batch during M7) with clear messages.
+- Each milestone has a "Done when" check in §12. Run it, paste the evidence into
+  results/milestones/M<n>.md, commit, then continue. Do not skip ahead if a check fails; fix it.
+- Write unit tests for metrics.py, acceptance.py (including the A/A false-accept case with synthetic
+  data) and ledger.py replay. Mock Harbor in loop.py tests. Only M1, M2-verify, and M7 spend money.
+- Prefer the simplest implementation that satisfies the spec. No web UI, no database, no extra services.
+- If the DSH version you pin differs from the spec's assumptions (CLI flags, patch format, session log
+  fields), adapt the adapter and document the deltas in docs/DSH_NOTES.md; do not change the protocol.
+- If you are blocked on something only a human can decide, finish everything that doesn't depend on
+  it, commit, and end your turn with the question stated in one paragraph.
+
+CANDIDATES
+- The candidate pool is candidates/seed_queue.yaml (read candidates/README.md first). It was imported
+  from https://github.com/Milbaxter/dsh-intelligence-lab at the pinned commit; clone that repo
+  read-only for the remix sources and plugin-ideas/README.md.
+- In M3 implement `excalibur queue import`: vendor each queued community plugin at a pinned commit
+  into harness/vendor/<id> (resolve RESOLVE_AT_IMPORT and write the commit back), copy remixes into
+  plugins/<id>/, generate plugin.yaml from the catalog fields, run the static check. Third-party
+  plugins that fail the static check or do not load under the pinned DSH become status: excluded
+  with the reason — do not patch third-party code. Adapt remixes only where the DSH API shape
+  differs, and record adaptations in docs/DSH_NOTES.md.
+- Ideas (source.kind: idea) are implemented by the coder step only when they reach the front of
+  the queue. The three Tier A ideas in the pilot need real implementations; keep each under 300 LOC.
+
+PILOT (M7) SPECIFICS
+- Queue: exactly the 20 entries with pilot: true, in their `order`. Do not add others.
+- Trigger one meta-review after 8 decided candidates using `agent -p` with the strongest model from
+  `agent --list-models`; ingest proposals per §9.4 but do NOT auto-implement new candidates in the
+  pilot (queue them only).
+- Stop when the queue is empty, the budget cap fires, or 20 candidates are decided.
+
+FINAL REPORT (your last message)
+1. Measured $/trial, tokens/trial (billed), wall/trial, and pass rate of the baseline on the dev split.
+2. results/LEADERBOARD.md summary: accepted / rejected / accepted_dev_only with Δpass and Δtokens.
+3. Whether the positive controls behaved as expected, and if not, your diagnosis.
+4. Re-projected cost for a 100-candidate campaign under the lean profile using measured numbers.
+5. Anything in the spec that turned out wrong or underspecified, with your recommended change.
+Start with M0 now.
+```
+
+## While it runs
+
+- Watch `results/ledger.jsonl` and `results/milestones/` in the repo; every decision is committed.
+- Check DeepSeek spend in the DeepSeek dashboard once or twice; the in-repo `budget.py` estimate is
+  derived from token counts and can drift a few percent from the invoice.
+- If the agent stops with a question, answer it in the same conversation; it resumes from the ledger.
+
+## After the pilot
+
+Read the final report's measured $/trial and the positive-control results. If the built-in rows show up
+as improvements and $/trial is ≤ $0.04, fund the lean campaign (§6.5) from the measured projection; if
+not, fix what the report flags before spending more.
