@@ -16,7 +16,9 @@
 
 ```
 You are building and then running Excalibur, an autonomous plugin-evaluation loop for DeepSeek Harness.
-The complete technical specification is in docs/EXCALIBUR_SPEC.md. Read it fully before doing anything.
+The complete technical specification is in docs/EXCALIBUR_SPEC.md. Read it fully before doing anything,
+then read docs/BUILDER_NOTES.md: it lists the known weak spots and the decided fallback for each, so you
+do not need to ask about them.
 Your job is to implement it milestone by milestone (M0 → M7, §12) and then execute the PILOT run (§6.6).
 
 HARD CONSTRAINTS
