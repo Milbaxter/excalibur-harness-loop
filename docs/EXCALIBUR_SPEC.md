@@ -14,7 +14,7 @@ Status: v1 spec, ready to implement. Written for an implementing model (e.g. Gro
 | **Benchmark** | **Terminal-Bench 2.1** (89 Docker tasks) run through **Harbor**, restricted to a calibrated **hard "dev" subset (~30 tasks)** on which the baseline scores 10–40%, plus a **held-out subset (~15 tasks)** used only to confirm accepted plugins. |
 | **Sandboxes** | **Daytona** cloud sandboxes via Harbor `--env daytona` (trials are I/O-bound, so 60–120 concurrent trials). The Cursor VM never runs task containers. |
 | **Controller** | A Python CLI (`excalibur`) in this repo, built and operated by a **Cursor Cloud Agent** (the *builder*), with all state in the git-committed ledger so any agent can resume it. |
-| **Supervisor / meta-reviewer** | A **Cursor Automation** (hourly cron, strongest available model) wakes, reads the ledger, and: writes `proposals.json` for any pending review bundle (every N=8 decided candidates the controller writes one), repairs controller crashes (bounded to `excalibur/` with tests), restarts a stalled loop, answers the builder's questions, ensures `results/FINAL_REPORT.md` exists, flags budget/safety issues. Reviews are asynchronous; DeepSeek V4 Pro is the fallback reviewer. See §9 and `docs/SUPERVISOR_AUTOMATION.md`. |
+| **Supervisor / meta-reviewer** | An hourly **supervisor wake** — by default the builder's own timer subscription (`subscribe_timer`, no setup); optionally an API-spawned frontier-model agent or a Cursor Automation (`docs/SUPERVISOR_AUTOMATION.md`) — reads the ledger, and: writes `proposals.json` for any pending review bundle (every N=8 decided candidates the controller writes one), repairs controller crashes (bounded to `excalibur/` with tests), restarts a stalled loop, answers the builder's questions, ensures `results/FINAL_REPORT.md` exists, flags budget/safety issues. Reviews are asynchronous; DeepSeek V4 Pro is the fallback reviewer. See §9 and `docs/SUPERVISOR_AUTOMATION.md`. |
 | **Metrics** | Pass rate (mean reward), **billed tokens/task**, USD/task, wall time/task. Acceptance requires a paired improvement on the dev set, confirmation on hold-out, and a token budget constraint (§7). |
 | **Anti-hacking** | Static scan of plugin source, sealed hold-out, cross-distribution canary tasks, meta-review audit, and the rule that a plugin must be describable without reference to any task (§8). |
 | **Budget (overnight)** | ~100 candidates in ~8–10 h. Cost is driven by trial volume (~4.5–7k agentic rollouts × ~1.5M mostly-cached prompt tokens each), not the per-token price: **≈ $300–550 lean, $450–750 standard** *(est., §6.5)*. DeepSeek tokens ≈ 60%, Daytona ≈ 20%, meta-review ≈ 10%. Achieved via three-stage funnel (smoke → screen → confirm) and evaluating 4 candidates in parallel. |
@@ -132,7 +132,7 @@ Components:
 2. **Evaluator** — Harbor (`uv tool install harbor`) with a custom `BaseInstalledAgent` subclass `DshAgent` that installs DSH into each task container and runs the headless profile. Trials run in Daytona sandboxes.
 3. **Subject** — DSH pinned version, profile `excalibur` = `excalibur-base` bundle + accepted plugins + candidate under test, model `deepseek-v4-flash`.
 4. **Registry** — `plugins/<id>/` directories with `plugin.yaml` manifest + TS source or npm spec. `results/ledger.jsonl` append-only event log.
-5. **Supervisor / meta-reviewer** — a scheduled Cursor Automation running a frontier model with full repo access. Reads review bundles and writes `results/meta/<n>/proposals.json`; restarts a stalled loop; answers the builder's questions; audits for benchmark hacking. The controller turns proposals into queued candidates/issues. Configuration and instructions: `docs/SUPERVISOR_AUTOMATION.md`.
+5. **Supervisor / meta-reviewer** — an hourly wake with full repo access: the builder's own timer subscription by default, or a separate API-spawned agent / Cursor Automation for an independent frontier-model reviewer. Reads review bundles and writes `results/meta/<n>/proposals.json`; restarts a stalled loop; answers the builder's questions; audits for benchmark hacking. The controller turns proposals into queued candidates/issues. Configuration and instructions: `docs/SUPERVISOR_AUTOMATION.md`.
 
 Design rules:
 - **Everything is resumable from git.** The controller must be killable at any instant; on restart it re-reads the ledger, reconciles any in-flight Harbor job directory (`jobs/<name>/result.json` present → ingest; absent → re-run), and continues.
@@ -351,7 +351,7 @@ For perspective, the same campaign with a frontier model at $15–75 per 1M outp
 
 **Build and run this profile first.** It validates the pipeline end to end, measures the real $/trial (replacing every *(est.)* above), and tests 15–20 candidates with enough power to detect large effects. Only after a successful pilot should the `lean`/`standard` campaign be funded.
 
-Cost assumptions: Daytona's **$200 sign-up credit (no card)** covers all sandbox compute; meta-review is done by the Supervisor Automation on the Cursor plan (fallback: DeepSeek V4 Pro at ~$0.20–0.40 per review); therefore the $20 is DeepSeek Flash tokens only.
+Cost assumptions: Daytona's **$200 sign-up credit (no card)** covers all sandbox compute; meta-review is done by the hourly supervisor wake on the Cursor plan (fallback: DeepSeek V4 Pro at ~$0.20–0.40 per review); therefore the $20 is DeepSeek Flash tokens only.
 
 | knob | pilot value | why |
 |---|---|---|
@@ -509,7 +509,7 @@ Every `meta_review_every` (default 8; allowed 5–10) *decided* candidates, or o
 - The open questions list from the previous review and what happened to them.
 
 ### 9.2 Who reviews, and when
-The reviewer is the **Supervisor Automation**: a Cursor Automation on an hourly cron running the strongest available frontier model against this repo (settings and full instructions in `docs/SUPERVISOR_AUTOMATION.md`). It has repo access, so it reads the bundle, the ledger, and any plugin's source directly — no API keys or CLI authentication inside the controller VM are required.
+The reviewer is the **supervisor wake**, defined by the checklist in `docs/SUPERVISOR_AUTOMATION.md`. Three deliveries run the same checklist: (A, default, zero setup) the builder subscribes an hourly `subscribe_timer` in its own conversation; (B, needs `CURSOR_API_KEY`) the builder spawns a separate cloud agent with a frontier model that self-schedules the same timer; (C) a manual Cursor Automation. All have repo access, so they read the bundle, the ledger, and plugin source directly — no CLI authentication inside the controller VM is required. Tier A reviews with the builder's own model; B and C give an independent reviewer.
 
 Flow (asynchronous by design):
 1. Controller writes `results/meta/<n>/bundle.md`, `git pull --rebase`, commits, pushes, and **continues evaluating**.
@@ -573,7 +573,7 @@ Alternative considered: run DSH on the controller and point its `fs`/`subprocess
 Two Cursor agents share the repo; the ledger and lock keep them from colliding.
 
 1. **Builder/operator — one Cloud Agent session** started from `AGENTS.md` / `docs/KICKOFF_PROMPT.md` (long-running agents on Ultra/Teams/Enterprise; on other plans, run the same prompt from a local Cursor agent). Builds M0–M6, then runs the pilot loop in a tmux session, committing after every milestone and every decided batch, so a mid-run VM recycle loses at most one batch.
-2. **Supervisor — a Cursor Automation on an hourly cron** (`docs/SUPERVISOR_AUTOMATION.md`). Reviews, restarts, answers, and flags as described in §9.2. Once M6 is done the supervisor alone can keep the loop alive: `excalibur resume` is idempotent, lock-aware, and time-boxed, so a chain of supervisor wakes is a valid way to run the whole campaign if the builder session ends.
+2. **Supervisor — an hourly wake** (`docs/SUPERVISOR_AUTOMATION.md`): the builder's own timer subscription by default, or an API-spawned agent / Automation. Reviews, repairs, restarts, answers, and flags as described in §9.2. Once M6 is done, each wake runs `uv run excalibur resume --max-minutes 40` in the foreground (an idle VM may hibernate, so the loop is not left detached); `resume` is idempotent, lock-aware, and time-boxed, so a chain of hourly wakes runs the whole campaign.
 3. **Self-hosted worker (optional).** Point a Cursor self-hosted worker pool at a beefier machine if Daytona is not wanted; then `--env docker` with `-n 16` becomes viable. Not needed for the default design.
 
 ### 10.4 Operator instructions (`.cursor/OPERATOR.md`, also used as the run prompt)
@@ -645,7 +645,7 @@ Testing guidance for the implementer: unit-test `metrics.py`/`acceptance.py` wit
 
 ## 14. Assumptions and open decisions (for the human)
 1. Sandboxes: Daytona is assumed (Harbor-supported, $0.05/vCPU-h, $200 free credit). Swap to Modal/E2B by changing `evaluator.env` — nothing else depends on it.
-2. Meta-review model: whichever frontier model the Supervisor Automation is configured with; the supervisor records it in `results/SUPERVISOR_LOG.md`. If the Automation is not created, reviews fall back to DeepSeek V4 Pro (§9.2) and nothing restarts a stalled loop except the human.
+2. Meta-review model: the builder's own model under Tier A (default), or the frontier model of the API-spawned agent / Automation under Tiers B–C; recorded in `results/SUPERVISOR_LOG.md`. If no wake ever fires, reviews fall back to DeepSeek V4 Pro (§9.2).
 3. Long-running agents require Ultra/Teams/Enterprise; on other plans run the builder locally and let the hourly supervisor keep the loop alive once M6 is done (§10.3).
 4. Terminal-Bench 2.1 is the v1 benchmark. Adding a second benchmark (e.g. an Agents' Last Exam near-term subset) as a *canary* is the recommended next step once the loop is stable.
 5. Acceptance thresholds (+3 pp / −15% cost / p ≤ 0.10) are starting points to be validated by the A/A runs; the meta-reviewer may propose changes but cannot auto-apply them.
