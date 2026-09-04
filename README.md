@@ -31,7 +31,18 @@ meant to be built from it by a coding agent inside Cursor.
 7. Cursor environment files, the builder + supervisor run model, budget kill-switch.
 8. Milestone plan with acceptance checks, risks, and open decisions.
 
-## How to use this repo next
+## Zero-touch run
 
-Follow `docs/KICKOFF_PROMPT.md`: set the three secrets, create the Supervisor Automation from
-`docs/SUPERVISOR_AUTOMATION.md`, then start a Cloud Agent on this repo with the kickoff prompt.
+1. Set the three secrets (`DEEPSEEK_API_KEY`, `DAYTONA_API_KEY`, `EXCALIBUR_BUDGET_USD=18`) in
+   Cursor → Cloud Agents → Secrets.
+2. Create the hourly Supervisor Automation from `docs/SUPERVISOR_AUTOMATION.md` (strongest model).
+3. Start a Cloud Agent on this repo and send: *"Read AGENTS.md and act as the Builder/operator. Build
+   Excalibur and run the pilot to completion, ending with results/FINAL_REPORT.md."*
+
+What happens without you: the builder implements M0–M7 and runs the 20-candidate pilot; the
+supervisor wakes hourly to write meta-reviews, repair controller crashes (bounded, with tests),
+restart a stalled loop, answer the builder's questions, and make sure `results/FINAL_REPORT.md`
+exists. The only things that reach you are a missing/invalid secret or an external outage, written
+to `results/ANSWERS.md` under "NEEDS HUMAN". The deliverable is `results/FINAL_REPORT.md`
+(spec §7.5): every candidate's verdict with Δ pass rate, Δ tokens and Δ cost, the accepted stack,
+measured economics, and the recommended next campaign.

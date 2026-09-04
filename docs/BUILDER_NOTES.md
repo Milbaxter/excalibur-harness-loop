@@ -57,8 +57,8 @@ commits. The controller must therefore:
 1. At review time: write `results/meta/<n>/bundle.md` (spec §9.1), `git pull --rebase`, commit, push,
    and **continue with the next batch**. Do not block.
 2. Before every batch: `git pull --rebase origin main`; if `results/meta/<n>/proposals.json` has
-   appeared, validate against `schemas/proposals.schema.json` (create this schema in M5 from the shape
-   in spec §9.3) and ingest per §9.4. Also read `results/ANSWERS.md` if it changed — the supervisor may
+   appeared, validate against `schemas/proposals.schema.json` (shipped in the repo; extend it only
+   backward-compatibly) and ingest per §9.4. Also read `results/ANSWERS.md` if it changed — the supervisor may
    have answered a question you asked.
 3. Fallback: if no `proposals.json` appears within 3 hours, run the review yourself with DeepSeek V4
    Pro over the DeepSeek API (`deepseek-v4-pro`, max reasoning, JSON enforced by prompt + schema, 2
@@ -74,6 +74,26 @@ commits. The controller must therefore:
    except to ingest.
 
 Never use V4 Pro or any non-Flash model for evaluation trials.
+
+## 4b. Crash contract and the supervisor's repair powers
+
+- Wrap the CLI entry point so any uncaught exception writes `results/incidents/<ts>.md` containing
+  the command line, the full traceback, `git rev-parse HEAD`, and the last 30 ledger lines, then
+  commits and pushes it before exiting non-zero. Test this in M6 with an injected exception.
+- The supervisor may fix bugs under `excalibur/`, `tests/`, `scripts/`, `.cursor/install.sh` and
+  will run `uv run pytest -q` before committing. Keep the test suite fast (< 60 s, no network) so
+  that is possible, and keep controller code free of state that would break when a fresh process
+  resumes after a fix.
+- Hand-edit scope: you write `results/milestones/*.md` and `results/incidents/*.md`; controller code
+  writes the ledger, verdicts, `LEADERBOARD.md`, `FINAL_REPORT.md`; the supervisor writes
+  `results/meta/**`, `SUPERVISOR_LOG.md`, `ANSWERS.md`.
+
+## 4c. The deliverable is `results/FINAL_REPORT.md`
+
+Implement `excalibur report --final` in M6 exactly to spec §7.5 (nine sections, every candidate in
+queue order including excluded/never-reached, all numbers derived from the ledger with event counts
+cited). Run it at the end of M7 before your final message. If your session ends early, the
+supervisor will run it; make sure it works from a clean checkout.
 
 ## 5. Session length and interruptions
 

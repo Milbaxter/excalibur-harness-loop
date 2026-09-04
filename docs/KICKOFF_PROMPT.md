@@ -19,6 +19,16 @@
 
 ## Prompt to paste
 
+Shortest version (the repo's `AGENTS.md` carries the binding constraints, so this is enough):
+
+```
+Read AGENTS.md in this repo and act as the Builder/operator. Build Excalibur milestone by milestone
+and run the pilot to completion, ending with results/FINAL_REPORT.md. Do not stop to ask unless a
+secret is missing.
+```
+
+Full version (identical intent, useful if you want every constraint in the conversation):
+
 ```
 You are building and then running Excalibur, an autonomous plugin-evaluation loop for DeepSeek Harness.
 The complete technical specification is in docs/EXCALIBUR_SPEC.md. Read it fully before doing anything,
@@ -35,7 +45,8 @@ HARD CONSTRAINTS
   the seeded hard split procedure in §6.6.
 - Pin exact versions: @deepseek-ai/dsh (write to harness/dsh.version), harbor, the terminal-bench
   dataset version, Node 22, Python 3.12. Never upgrade mid-session.
-- Never hand-edit results/, benchmarks/*.txt, or plugin verdicts. The ledger is the only state.
+- Never hand-edit results/ledger.jsonl, results/LEADERBOARD.md, benchmarks/*.txt, or plugin verdicts;
+  those are written only by controller code. results/milestones/ and results/incidents/ are yours.
 - Sandboxes run in Daytona via Harbor (--env daytona). Do not try to run task containers on this VM.
 - Secrets are available as env vars: DEEPSEEK_API_KEY, DAYTONA_API_KEY, EXCALIBUR_BUDGET_USD. If any is
   missing, stop and say exactly which one; do not work around it.
@@ -49,6 +60,11 @@ WORKING RULES
 - Prefer the simplest implementation that satisfies the spec. No web UI, no database, no extra services.
 - If the DSH version you pin differs from the spec's assumptions (CLI flags, patch format, session log
   fields), adapt the adapter and document the deltas in docs/DSH_NOTES.md; do not change the protocol.
+- On any uncaught exception the controller must write results/incidents/<ts>.md (traceback, command,
+  ledger tail) and commit it before exiting; the Supervisor Automation uses it to repair and restart.
+- A Supervisor Automation may commit under results/meta/**, results/SUPERVISOR_LOG.md,
+  results/ANSWERS.md and may fix controller bugs under excalibur/ with tests. `git pull --rebase`
+  before every commit and read results/ANSWERS.md when it changes.
 - If you are blocked on something only a human can decide, finish everything that doesn't depend on
   it, commit, and end your turn with the question stated in one paragraph.
 
@@ -72,7 +88,9 @@ PILOT (M7) SPECIFICS
   Ingest proposals per §9.4 but do NOT auto-implement new candidates in the pilot (queue them only).
 - Stop when the queue is empty, the budget cap fires, or 20 candidates are decided.
 
-FINAL REPORT (your last message)
+FINAL REPORT
+Write results/FINAL_REPORT.md with all nine sections of spec §7.5 (`uv run excalibur report --final`),
+commit and push it, then end with a summary containing:
 1. Measured $/trial, tokens/trial (billed), wall/trial, and pass rate of the baseline on the dev split.
 2. results/LEADERBOARD.md summary: accepted / rejected / accepted_dev_only with Δpass and Δtokens.
 3. Whether the positive controls behaved as expected, and if not, your diagnosis.

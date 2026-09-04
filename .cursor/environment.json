@@ -1,0 +1,5 @@
+{
+  "install": "bash .cursor/install.sh",
+  "start": "mkdir -p /tmp/excalibur && date -u +%FT%TZ > /tmp/excalibur/start.ok",
+  "terminals": []
+}
