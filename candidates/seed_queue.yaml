@@ -1,0 +1,1727 @@
+source:
+  repo: https://github.com/Milbaxter/dsh-intelligence-lab
+  commit: 5ff2d2c0a19f65521ea496374df68b435012fe2f
+controls:
+- id: dsh-plan-mode
+  source:
+    kind: dsh-builtin
+    row: plan
+  category: planning
+  pilot: true
+  order: 1
+  note: positive control
+- id: dsh-compaction-basic
+  source:
+    kind: dsh-builtin
+    row: compaction
+  category: context
+  pilot: true
+  order: 2
+  note: positive control
+plugins:
+- id: dsh-doublecheck
+  category: verification
+  hypothesis: Forces a requirements grill and red/green test evidence before the agent can claim a fix.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/PerryLink/dsh-doublecheck
+    install: github:PerryLink/dsh-doublecheck
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 3
+- id: dsh-proof
+  category: verification
+  hypothesis: Spawns a read-only verifier before the turn closes and steers gaps back into the loop.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/EvilIrving/dsh-proof
+    install: github:EvilIrving/dsh-proof
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 4
+- id: dsh-pain-point-check
+  category: planning
+  hypothesis: After two non-converged experiments, force the model to answer what actually failed before more edits.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/ICCuse/dsh-pain-point-check
+    install: github:ICCuse/dsh-pain-point-check
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 5
+- id: dsh-specflow
+  category: planning
+  hypothesis: Turns the issue into a spec + goal-backed tasks before implementation.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/lonelymoon87/dsh-specflow
+    install: github:lonelymoon87/dsh-specflow
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 6
+- id: dsh-task-planner
+  category: planning
+  hypothesis: 'Condition-reflex planning: recall similar past tasks, then decompose against current tools.'
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/ztl34245881-commits/dsh-task-planner
+    install: github:ztl34245881-commits/dsh-task-planner
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 7
+- id: dsh-plan-and-solve
+  category: planning
+  hypothesis: Write a Markdown plan and verifier checklist before any source edit, then execute against that checklist.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Optim-Agent/dsh-plans
+    install: github:Optim-Agent/dsh-plans
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 8
+- id: dsh-premise-guard
+  category: context
+  hypothesis: Injects a one-shot notice when compaction drops a critical literal anchor.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/ICCuse/dsh-premise-guard
+    install: github:ICCuse/dsh-premise-guard
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 9
+- id: dsh-context-proxy
+  category: context
+  hypothesis: On-demand context_query / context_slice / context_grep over the session log instead of stuffing everything
+    into the prompt.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/EvilIrving/dsh-context-proxy
+    install: github:EvilIrving/dsh-context-proxy
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 10
+- id: dsh-tool-search
+  category: skills
+  hypothesis: 'Hermes-style progressive disclosure: hide long-tail tools until searched.'
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/Letter2025/dsh-tool-search
+    install: github:Letter2025/dsh-tool-search
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 11
+- id: dsh-fail-logger
+  category: failure
+  hypothesis: Dedupes failed tool calls into a skill so the agent stops repeating the same broken command.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/Areium/dsh-fail-logger
+    install: github:Areium/dsh-fail-logger
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: true
+  order: 12
+- id: remix-test-first-gate
+  category: remix
+  hypothesis: 'Local remix: inject a SWE-bench checklist and a `run_repro_tests` tool before any file edit.'
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/test-first-gate
+  status: queued
+  pilot: true
+  order: 13
+- id: remix-verify-loop
+  category: remix
+  hypothesis: 'Remix of dsh-proof + dsh-doublecheck: one `close_turn` tool that requires a passing local test command.'
+  risk: medium
+  source:
+    kind: local-remix
+    path: file:remixes/verify-loop
+  status: queued
+  pilot: true
+  order: 14
+- id: remix-failure-notebook
+  category: remix
+  hypothesis: 'Slimmer fail-logger: append-only FAILURES.md, injected each turn, no extra skill taxonomy.'
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/failure-notebook
+  status: queued
+  pilot: true
+  order: 15
+- id: remix-smallest-patch
+  category: remix
+  hypothesis: 'System-prompt prior: edit one file, three hunks max, no drive-by refactors. Matches how Lite was
+    filtered.'
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/smallest-patch
+  status: queued
+  pilot: true
+  order: 16
+- id: remix-compact-then-act
+  category: remix
+  hypothesis: After 8 tool calls, force a 10-line state card (failing test, files, next action) and drop raw logs.
+  risk: medium
+  source:
+    kind: local-remix
+    path: file:remixes/compact-then-act
+  status: queued
+  pilot: true
+  order: 17
+- id: dsh-tool-validator
+  category: verification
+  hypothesis: Catch malformed or repeated tool calls and force a one-argument change before retry.
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/tool-validator
+  status: queued
+  pilot: false
+  order: 18
+- id: dsh-multi-agent-debate
+  category: orchestration
+  hypothesis: Two competing localizations, same cheap model, pick one before the first edit.
+  risk: high
+  source:
+    kind: local-remix
+    path: file:remixes/multi-agent-debate
+  status: queued
+  pilot: false
+  order: 19
+- id: remix-bash-timeout-extend
+  category: remix
+  hypothesis: Patch the default bash plugin timeout from 300s to 900s for Django test suites.
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/bash-timeout-extend
+  status: queued
+  pilot: false
+  order: 20
+- id: remix-plan-before-edit
+  category: remix
+  hypothesis: Refuse the first workspace write until the agent writes a 5-line localization note.
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/plan-before-edit
+  status: queued
+  pilot: false
+  order: 21
+- id: dsh-inspect
+  category: verification
+  hypothesis: Adversarial checkup → fix → review loop.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/omdsh-dev/dsh-inspect
+    install: github:omdsh-dev/dsh-inspect
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 22
+- id: dsh-plannotator
+  category: planning
+  hypothesis: Anchored plan review before the agent spends the edit budget.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/titanwings/dsh-plannotator
+    install: github:titanwings/dsh-plannotator
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 23
+- id: dsh-track
+  category: planning
+  hypothesis: Decision-point protocol and a Linear-style issue store inside the session.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/fakechris/dsh-track
+    install: github:fakechris/dsh-track
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 24
+- id: billion-context-dsh
+  category: context
+  hypothesis: Model-driven context compression — the model decides what to keep.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/Tyan66666/billion-context-dsh
+    install: github:Tyan66666/billion-context-dsh
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 25
+- id: dsh-context-compactor
+  category: context
+  hypothesis: 'Model-driven surface compaction: the agent replaces old ranges with durable checkpoints instead of
+    dropping them.'
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/lmst2/dsh-asc
+    install: github:lmst2/dsh-asc
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 26
+- id: dsh-context-doctor
+  category: context
+  hypothesis: Read-only audit of instruction chains, skill catalogs, and tool schemas.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/Zhenyu98/dsh-context-doctor
+    install: github:Zhenyu98/dsh-context-doctor
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 27
+- id: distill
+  category: memory
+  hypothesis: Background subagent reflection that writes reusable skills from the session.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/LoserFox/distill
+    install: github:LoserFox/distill
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 28
+- id: dsh-file-memory
+  category: memory
+  hypothesis: Memorize key premises into a session notes file so compaction cannot drop them.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/ICCuse/dsh-file-memory
+    install: github:ICCuse/dsh-file-memory
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 29
+- id: dsh-knowledge
+  category: memory
+  hypothesis: Shared Markdown knowledge base with kb_add / kb_search.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/ICCuse/dsh-knowledge
+    install: github:ICCuse/dsh-knowledge
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 30
+- id: dsh-memento
+  category: memory
+  hypothesis: Bounded, approval-gated, auditable ctx.memory with snapshot injection.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/PerryLink/dsh-memento
+    install: github:PerryLink/dsh-memento
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 31
+- id: dsh-memory
+  category: memory
+  hypothesis: remember / recall / forget tools with per-turn prompt injection.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/flymysql/dsh-memory
+    install: github:flymysql/dsh-memory
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 32
+- id: dsh-memory-cited
+  category: memory
+  hypothesis: Distilled facts carry session citations back to the lossless log.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Jesse-njx/dsh-memory
+    install: github:Jesse-njx/dsh-memory
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 33
+- id: dsh-memory-evolve
+  category: memory
+  hypothesis: Git-branch-aware long-term memory and background skill evolution.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/dsh-external/dsh-memory-evolve
+    install: github:dsh-external/dsh-memory-evolve
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 34
+- id: dsh-memory-meow
+  category: memory
+  hypothesis: Project-scoped PROJECT.md snapshot plus auto-reflection after ReAct tasks.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/Phant0Meow/dsh-memory-meow
+    install: github:Phant0Meow/dsh-memory-meow
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 35
+- id: dsh-mneme
+  category: memory
+  hypothesis: SQLite + Markdown memory with offline semantic search and dream consolidation.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/modusensus/dsh-mneme
+    install: github:modusensus/dsh-mneme
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 36
+- id: dsh-mnemon
+  category: memory
+  hypothesis: 'Three-tier Mnemon memory: runtime, documents, memory spaces.'
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/omdsh-dev/dsh-mnemon
+    install: github:omdsh-dev/dsh-mnemon
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 37
+- id: dsh-advisor
+  category: orchestration
+  hypothesis: A second model passively reviews each turn and injects notes. Here the reviewer is also cheap unless
+    configured otherwise.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/btspoony/dsh-advisor
+    install: github:btspoony/dsh-advisor
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 38
+- id: dsh-auto-continue
+  category: runtime
+  hypothesis: Auto-resume interrupted turns after timeouts or host crashes.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/HsiangNianian/dsh-auto-continue
+    install: github:HsiangNianian/dsh-auto-continue
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 39
+- id: dsh-code-intel
+  category: search
+  hypothesis: Tree-sitter symbol index plus lexical / embedding search.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/lonelymoon87/dsh-code-intel
+    install: github:lonelymoon87/dsh-code-intel
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 40
+- id: dsh-knowledge-graph
+  category: search
+  hypothesis: CONTAINS / EXPORTS / IMPORTS graph over the checkout.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Luke-Yong/dsh-plugin-knowledge-graph
+    install: github:Luke-Yong/dsh-plugin-knowledge-graph
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 41
+- id: dsh-preset-flash-director
+  category: orchestration
+  hypothesis: Token-economical director that delegates deep reasoning to expert subagents.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/zhaoyilun/dsh-preset-flash-director
+    install: github:zhaoyilun/dsh-preset-flash-director
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 42
+- id: dsh-skillport
+  category: skills
+  hypothesis: Progressive-disclosure index over Claude/Codex/Cursor skill libraries.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Jesse-njx/dsh-skillport
+    install: github:Jesse-njx/dsh-skillport
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 43
+- id: dsh-subagent-tools
+  category: orchestration
+  hypothesis: Per-call model / persona / toolFilter overrides for subagents.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/lynx-gt/dsh-subagent-tools
+    install: github:lynx-gt/dsh-subagent-tools
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 44
+- id: dsh-toolkit
+  category: runtime
+  hypothesis: 'Ten deterministic tools: json, regex, diff, stat, schema, …'
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/omdsh-dev/dsh-toolkit
+    install: github:omdsh-dev/dsh-toolkit
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 45
+- id: dsh-workflow
+  category: orchestration
+  hypothesis: Generatable, resumable multi-agent workflow layer.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/icetomoyo/dsh_workflow
+    install: github:icetomoyo/dsh_workflow
+    pin: RESOLVE_AT_IMPORT
+  status: queued
+  pilot: false
+  order: 46
+- id: dsh-continual-evolve
+  category: failure
+  hypothesis: Versioned, rollback-safe evolution of prompts, memory, and skills from trajectories.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/ZK-Andy/dsh-continual-evolve
+    install: github:ZK-Andy/dsh-continual-evolve
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: cross-session self-modification breaks per-trial isolation
+- id: dsh-deep-research
+  category: search
+  hypothesis: Adaptive deep-research orchestrator on the official workflow engine.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/omdsh-dev/dsh-deep-research
+    install: github:omdsh-dev/dsh-deep-research
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: requires web/network access
+- id: dsh-docker
+  category: runtime
+  hypothesis: Typed docker/compose control for the agent.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/Jesse-njx/dsh-docker
+    install: github:Jesse-njx/dsh-docker
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: docker-in-sandbox not available in Harbor task containers
+- id: dsh-evolve
+  category: runtime
+  hypothesis: The agent hot-mounts its own plugins mid-session.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/william-jin-cmu/dsh-evolve
+    install: github:william-jin-cmu/dsh-evolve
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: cross-session self-modification breaks per-trial isolation
+- id: dsh-mcp-bridge
+  category: memory
+  hypothesis: Wires MCP servers (GitHub, filesystem, memory, Playwright) into the agent as native tools.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/Edge-Echo/dsh-mcp-bridge
+    install: github:Edge-Echo/dsh-mcp-bridge
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: requires external MCP servers
+- id: dsh-model-router
+  category: orchestration
+  hypothesis: Route simple steps to flash and escalate hard ones to a smarter model.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/tianji-qingtian/dsh-model-router
+    install: github:tianji-qingtian/dsh-model-router
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: changes model/provider (locked llm row, §8.2)
+- id: dsh-prompt-profile
+  category: prompt
+  hypothesis: Reusable Markdown prompt profiles with argument substitution.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/BrambleXu/dsh-prompt-profile
+    install: github:BrambleXu/dsh-prompt-profile
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: UI-oriented; no headless effect expected
+- id: dsh-prompt-studio
+  category: prompt
+  hypothesis: Edit built-in system-prompt sections with live preview.
+  risk: low
+  source:
+    kind: github
+    repo: https://github.com/Moeblack/dsh-prompt-studio
+    install: github:Moeblack/dsh-prompt-studio
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: UI-oriented; no headless effect expected
+- id: dsh-sidechain
+  category: orchestration
+  hypothesis: Persistent /side sessions and one-shot /btw forks.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Buyi-wsgzg/dsh-sidechain
+    install: github:Buyi-wsgzg/dsh-sidechain
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: interactive-only feature
+- id: dsh-subagent-claude
+  category: orchestration
+  hypothesis: Delegate execution to a Claude Code CLI while DeepSeek plans.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/yaways/dsh-subagent-claude-code-wrapper
+    install: github:yaways/dsh-subagent-claude-code-wrapper
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: delegates to a non-DeepSeek model
+- id: dsh-turn-rewind
+  category: runtime
+  hypothesis: Rewind conversation and workspace via a change ledger.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/Anionex/dsh-turn-rewind
+    install: github:Anionex/dsh-turn-rewind
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: interactive-only feature
+- id: dsh-workspace-rag
+  category: search
+  hypothesis: Local vector index over workspace files so the agent can pull cross-file symbols without naming them.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/AlowEnsoul/dsh-rag-kb
+    install: github:AlowEnsoul/dsh-rag-kb
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: requires embedding service/network (verify; re-enable if fully local)
+- id: forkprobe
+  category: verification
+  hypothesis: Compare multiple skills on the same task and pick the winner.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/Jayden-X-L/forkprobe
+    install: github:Jayden-X-L/forkprobe
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: interactive-only feature
+- id: llm-adaptive
+  category: orchestration
+  hypothesis: Per-request complexity routing across providers.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/dylan121322/llm-adaptive
+    install: github:dylan121322/llm-adaptive
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: changes model/provider (locked llm row, §8.2)
+- id: modsearch
+  category: search
+  hypothesis: Web / X search bridge returning structured JSON evidence.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/liustack/modsearch
+    install: github:liustack/modsearch
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: requires web/network access
+- id: mstar-harness
+  category: orchestration
+  hypothesis: Skill-driven workflow agent for structured harness-loop engineering.
+  risk: high
+  source:
+    kind: github
+    repo: https://github.com/btspoony/mstar-harness
+    install: github:btspoony/mstar-harness
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: whole-harness replacement, not composable with the stack
+- id: nowledge-mem
+  category: memory
+  hypothesis: Context Bundle injection and turn-end thread capture across tools.
+  risk: medium
+  source:
+    kind: github
+    repo: https://github.com/nowledge-co/nowledge-mem-deepseek-harness
+    install: github:nowledge-co/nowledge-mem-deepseek-harness
+    pin: RESOLVE_AT_IMPORT
+  status: excluded
+  reason: external memory service
+- id: remix-mneme-swe-notes
+  category: remix
+  hypothesis: 'If mneme is kept, pin a schema: repo, failing test, root-cause file, patch hunk, outcome.'
+  risk: medium
+  source:
+    kind: local-remix
+    path: file:remixes/mneme-swe-notes
+  status: excluded
+  reason: SWE-bench-specific notes; violates generality rule
+- id: remix-no-web
+  category: remix
+  hypothesis: 'Ablation: unload web search / browser plugins for the eval profile.'
+  risk: low
+  source:
+    kind: local-remix
+    path: file:remixes/no-web
+  status: excluded
+  reason: ablation of a capability the baseline does not have (no web in excalibur-base)
+ideas:
+- id: idea-100-failure-signal-parser
+  number: 100
+  title: Failure Signal Parser
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#100
+  status: backlog
+  tier: A
+  pilot: true
+  order: 47
+- id: idea-063-action-precondition-checker
+  number: 63
+  title: Action Precondition Checker
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#63
+  status: backlog
+  tier: A
+  pilot: true
+  order: 48
+- id: idea-065-observation-completeness-detector
+  number: 65
+  title: Observation Completeness Detector
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#65
+  status: backlog
+  tier: A
+  pilot: true
+  order: 49
+- id: idea-087-fail-pass-provenance
+  number: 87
+  title: Fail–Pass Provenance
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#87
+  status: backlog
+  tier: A
+  pilot: false
+  order: 50
+- id: idea-095-acceptance-criteria-compiler
+  number: 95
+  title: Acceptance Criteria Compiler
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#95
+  status: backlog
+  tier: A
+  pilot: false
+  order: 51
+- id: idea-052-evidence-coverage-matrix
+  number: 52
+  title: Evidence Coverage Matrix
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#52
+  status: backlog
+  tier: A
+  pilot: false
+  order: 52
+- id: idea-060-evidence-freshness-guard
+  number: 60
+  title: Evidence Freshness Guard
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#60
+  status: backlog
+  tier: A
+  pilot: false
+  order: 53
+- id: idea-070-failure-recovery-automaton
+  number: 70
+  title: Failure Recovery Automaton
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#70
+  status: backlog
+  tier: A
+  pilot: false
+  order: 54
+- id: idea-064-tool-result-normalizer
+  number: 64
+  title: Tool Result Normalizer
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#64
+  status: backlog
+  tier: B
+  pilot: false
+  order: 55
+- id: idea-084-progress-pulse
+  number: 84
+  title: Progress Pulse
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#84
+  status: backlog
+  tier: B
+  pilot: false
+  order: 56
+- id: idea-069-information-gain-tool-selector
+  number: 69
+  title: Information-Gain Tool Selector
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#69
+  status: backlog
+  tier: B
+  pilot: false
+  order: 57
+- id: idea-047-calibration-coach
+  number: 47
+  title: Calibration Coach
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#47
+  status: backlog
+  tier: B
+  pilot: false
+  order: 58
+- id: idea-076-localization-handoff-packet
+  number: 76
+  title: Localization Handoff Packet
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#76
+  status: backlog
+  tier: B
+  pilot: false
+  order: 59
+- id: idea-072-disagreement-to-probe-resolver
+  number: 72
+  title: Disagreement-to-Probe Resolver
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#72
+  status: backlog
+  tier: B
+  pilot: false
+  order: 60
+- id: idea-007-attention-residue-cleaner
+  number: 7
+  title: Attention Residue Cleaner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#7
+  status: backlog
+  tier: B
+  pilot: false
+  order: 61
+- id: idea-003-cognitive-mode-configurator
+  number: 3
+  title: Cognitive Mode Configurator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#3
+  status: backlog
+  tier: C
+  pilot: false
+  order: 62
+- id: idea-004-fast-slow-escalator
+  number: 4
+  title: Fast–Slow Escalator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#4
+  status: backlog
+  tier: C
+  pilot: false
+  order: 63
+- id: idea-005-goal-shield
+  number: 5
+  title: Goal Shield
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#5
+  status: backlog
+  tier: C
+  pilot: false
+  order: 64
+- id: idea-006-interruption-ledger
+  number: 6
+  title: Interruption Ledger
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#6
+  status: backlog
+  tier: C
+  pilot: false
+  order: 65
+- id: idea-008-focus-stability-modulator
+  number: 8
+  title: Focus Stability Modulator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#8
+  status: backlog
+  tier: C
+  pilot: false
+  order: 66
+- id: idea-009-resolution-level-dial
+  number: 9
+  title: Resolution-Level Dial
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#9
+  status: backlog
+  tier: C
+  pilot: false
+  order: 67
+- id: idea-010-internal-external-balance-governor
+  number: 10
+  title: Internal–External Balance Governor
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#10
+  status: backlog
+  tier: C
+  pilot: false
+  order: 68
+- id: idea-012-counterfactual-patch-simulator
+  number: 12
+  title: Counterfactual Patch Simulator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#12
+  status: backlog
+  tier: C
+  pilot: false
+  order: 69
+- id: idea-013-causal-graph-scratchpad
+  number: 13
+  title: Causal Graph Scratchpad
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#13
+  status: backlog
+  tier: C
+  pilot: false
+  order: 70
+- id: idea-014-abduction-action-prediction-loop
+  number: 14
+  title: Abduction–Action–Prediction Loop
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#14
+  status: backlog
+  tier: C
+  pilot: false
+  order: 71
+- id: idea-015-competing-world-models
+  number: 15
+  title: Competing World Models
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#15
+  status: backlog
+  tier: C
+  pilot: false
+  order: 72
+- id: idea-016-state-belief-tracker
+  number: 16
+  title: State Belief Tracker
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#16
+  status: backlog
+  tier: C
+  pilot: false
+  order: 73
+- id: idea-017-invariant-world-model
+  number: 17
+  title: Invariant World Model
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#17
+  status: backlog
+  tier: C
+  pilot: false
+  order: 74
+- id: idea-018-affordance-mapper
+  number: 18
+  title: Affordance Mapper
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#18
+  status: backlog
+  tier: C
+  pilot: false
+  order: 75
+- id: idea-020-surprise-to-question-converter
+  number: 20
+  title: Surprise-to-Question Converter
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#20
+  status: backlog
+  tier: C
+  pilot: false
+  order: 76
+- id: idea-023-pattern-separation-gate
+  number: 23
+  title: Pattern Separation Gate
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#23
+  status: backlog
+  tier: C
+  pilot: false
+  order: 77
+- id: idea-024-pattern-completion-retriever
+  number: 24
+  title: Pattern Completion Retriever
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#24
+  status: backlog
+  tier: C
+  pilot: false
+  order: 78
+- id: idea-025-memory-reconsolidation
+  number: 25
+  title: Memory Reconsolidation
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#25
+  status: backlog
+  tier: C
+  pilot: false
+  order: 79
+- id: idea-026-episodic-scene-builder
+  number: 26
+  title: Episodic Scene Builder
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#26
+  status: backlog
+  tier: C
+  pilot: false
+  order: 80
+- id: idea-027-prospective-memory-triggers
+  number: 27
+  title: Prospective Memory Triggers
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#27
+  status: backlog
+  tier: C
+  pilot: false
+  order: 81
+- id: idea-028-forgetting-by-utility
+  number: 28
+  title: Forgetting-by-Utility
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#28
+  status: backlog
+  tier: C
+  pilot: false
+  order: 82
+- id: idea-029-contradiction-aware-memory
+  number: 29
+  title: Contradiction-Aware Memory
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#29
+  status: backlog
+  tier: C
+  pilot: false
+  order: 83
+- id: idea-031-impasse-to-subgoal
+  number: 31
+  title: Impasse-to-Subgoal
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#31
+  status: backlog
+  tier: C
+  pilot: false
+  order: 84
+- id: idea-032-hierarchical-option-planner
+  number: 32
+  title: Hierarchical Option Planner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#32
+  status: backlog
+  tier: C
+  pilot: false
+  order: 85
+- id: idea-034-branch-budget-allocator
+  number: 34
+  title: Branch Budget Allocator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#34
+  status: backlog
+  tier: C
+  pilot: false
+  order: 86
+- id: idea-035-reversible-first-planner
+  number: 35
+  title: Reversible-First Planner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#35
+  status: backlog
+  tier: C
+  pilot: false
+  order: 87
+- id: idea-036-plan-repairer
+  number: 36
+  title: Plan Repairer
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#36
+  status: backlog
+  tier: C
+  pilot: false
+  order: 88
+- id: idea-037-constraint-propagation-planner
+  number: 37
+  title: Constraint Propagation Planner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#37
+  status: backlog
+  tier: C
+  pilot: false
+  order: 89
+- id: idea-038-means-ends-difference-reducer
+  number: 38
+  title: Means–Ends Difference Reducer
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#38
+  status: backlog
+  tier: C
+  pilot: false
+  order: 90
+- id: idea-039-landmark-planner
+  number: 39
+  title: Landmark Planner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#39
+  status: backlog
+  tier: C
+  pilot: false
+  order: 91
+- id: idea-040-diverse-plan-portfolio
+  number: 40
+  title: Diverse Plan Portfolio
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#40
+  status: backlog
+  tier: C
+  pilot: false
+  order: 92
+- id: idea-041-confidence-ledger
+  number: 41
+  title: Confidence Ledger
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#41
+  status: backlog
+  tier: C
+  pilot: false
+  order: 93
+- id: idea-042-unknowns-register
+  number: 42
+  title: Unknowns Register
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#42
+  status: backlog
+  tier: C
+  pilot: false
+  order: 94
+- id: idea-043-assumption-expiry
+  number: 43
+  title: Assumption Expiry
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#43
+  status: backlog
+  tier: C
+  pilot: false
+  order: 95
+- id: idea-044-premise-guard-remix
+  number: 44
+  title: Premise Guard Remix
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#44
+  status: backlog
+  tier: C
+  pilot: false
+  order: 96
+- id: idea-045-bias-counterweight
+  number: 45
+  title: Bias Counterweight
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#45
+  status: backlog
+  tier: C
+  pilot: false
+  order: 97
+- id: idea-046-disconfirmation-seeker
+  number: 46
+  title: Disconfirmation Seeker
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#46
+  status: backlog
+  tier: C
+  pilot: false
+  order: 98
+- id: idea-048-cognitive-load-meter
+  number: 48
+  title: Cognitive Load Meter
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#48
+  status: backlog
+  tier: C
+  pilot: false
+  order: 99
+- id: idea-050-stop-continue-arbiter
+  number: 50
+  title: Stop/Continue Arbiter
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#50
+  status: backlog
+  tier: C
+  pilot: false
+  order: 100
+- id: idea-051-prediction-before-action
+  number: 51
+  title: Prediction-Before-Action
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#51
+  status: backlog
+  tier: C
+  pilot: false
+  order: 101
+- id: idea-053-independent-reproduction
+  number: 53
+  title: Independent Reproduction
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#53
+  status: backlog
+  tier: C
+  pilot: false
+  order: 102
+- id: idea-054-metamorphic-test-generator
+  number: 54
+  title: Metamorphic Test Generator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#54
+  status: backlog
+  tier: C
+  pilot: false
+  order: 103
+- id: idea-055-property-miner
+  number: 55
+  title: Property Miner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#55
+  status: backlog
+  tier: C
+  pilot: false
+  order: 104
+- id: idea-056-differential-oracle
+  number: 56
+  title: Differential Oracle
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#56
+  status: backlog
+  tier: C
+  pilot: false
+  order: 105
+- id: idea-057-mutation-adequacy-probe
+  number: 57
+  title: Mutation Adequacy Probe
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#57
+  status: backlog
+  tier: C
+  pilot: false
+  order: 106
+- id: idea-058-boundary-cartographer
+  number: 58
+  title: Boundary Cartographer
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#58
+  status: backlog
+  tier: C
+  pilot: false
+  order: 107
+- id: idea-059-negative-space-verifier
+  number: 59
+  title: Negative-Space Verifier
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#59
+  status: backlog
+  tier: C
+  pilot: false
+  order: 108
+- id: idea-061-tool-affordance-learner
+  number: 61
+  title: Tool Affordance Learner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#61
+  status: backlog
+  tier: C
+  pilot: false
+  order: 109
+- id: idea-062-progressive-tool-disclosure
+  number: 62
+  title: Progressive Tool Disclosure
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#62
+  status: backlog
+  tier: C
+  pilot: false
+  order: 110
+- id: idea-066-reversible-action-wrapper
+  number: 66
+  title: Reversible Action Wrapper
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#66
+  status: backlog
+  tier: C
+  pilot: false
+  order: 111
+- id: idea-067-idempotence-planner
+  number: 67
+  title: Idempotence Planner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#67
+  status: backlog
+  tier: C
+  pilot: false
+  order: 112
+- id: idea-068-tool-sequence-macro-learner
+  number: 68
+  title: Tool Sequence Macro Learner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#68
+  status: backlog
+  tier: C
+  pilot: false
+  order: 113
+- id: idea-071-role-diverse-deliberation
+  number: 71
+  title: Role-Diverse Deliberation
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#71
+  status: backlog
+  tier: C
+  pilot: false
+  order: 114
+- id: idea-073-adversarial-collaboration
+  number: 73
+  title: Adversarial Collaboration
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#73
+  status: backlog
+  tier: C
+  pilot: false
+  order: 115
+- id: idea-074-theory-of-mind-handoff
+  number: 74
+  title: Theory-of-Mind Handoff
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#74
+  status: backlog
+  tier: C
+  pilot: false
+  order: 116
+- id: idea-075-independent-localization-jury
+  number: 75
+  title: Independent Localization Jury
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#75
+  status: backlog
+  tier: C
+  pilot: false
+  order: 117
+- id: idea-077-cross-examination-verifier
+  number: 77
+  title: Cross-Examination Verifier
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#77
+  status: backlog
+  tier: C
+  pilot: false
+  order: 118
+- id: idea-078-consensus-with-minority-report
+  number: 78
+  title: Consensus-with-Minority-Report
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#78
+  status: backlog
+  tier: C
+  pilot: false
+  order: 119
+- id: idea-079-teach-back-delegate
+  number: 79
+  title: Teach-Back Delegate
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#79
+  status: backlog
+  tier: C
+  pilot: false
+  order: 120
+- id: idea-080-collective-memory-curator
+  number: 80
+  title: Collective Memory Curator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#80
+  status: backlog
+  tier: C
+  pilot: false
+  order: 121
+- id: idea-085-frustration-to-strategy-shift
+  number: 85
+  title: Frustration-to-Strategy Shift
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#85
+  status: backlog
+  tier: C
+  pilot: false
+  order: 122
+- id: idea-086-resource-homeostasis
+  number: 86
+  title: Resource Homeostasis
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#86
+  status: backlog
+  tier: C
+  pilot: false
+  order: 123
+- id: idea-088-error-curriculum-builder
+  number: 88
+  title: Error Curriculum Builder
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#88
+  status: backlog
+  tier: C
+  pilot: false
+  order: 124
+- id: idea-090-self-generated-micro-experiments
+  number: 90
+  title: Self-Generated Micro-Experiments
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#90
+  status: backlog
+  tier: C
+  pilot: false
+  order: 125
+- id: idea-091-sparse-concept-workspace
+  number: 91
+  title: Sparse Concept Workspace
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#91
+  status: backlog
+  tier: C
+  pilot: false
+  order: 126
+- id: idea-092-relational-structure-mapper
+  number: 92
+  title: Relational Structure Mapper
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#92
+  status: backlog
+  tier: C
+  pilot: false
+  order: 127
+- id: idea-093-abstraction-ladder
+  number: 93
+  title: Abstraction Ladder
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#93
+  status: backlog
+  tier: C
+  pilot: false
+  order: 128
+- id: idea-094-causal-analogy-engine
+  number: 94
+  title: Causal Analogy Engine
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#94
+  status: backlog
+  tier: C
+  pilot: false
+  order: 129
+- id: idea-096-minimal-sufficient-representation
+  number: 96
+  title: Minimal Sufficient Representation
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#96
+  status: backlog
+  tier: C
+  pilot: false
+  order: 130
+- id: idea-098-representation-red-team
+  number: 98
+  title: Representation Red-Team
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#98
+  status: backlog
+  tier: C
+  pilot: false
+  order: 131
+- id: idea-099-explanatory-compression-judge
+  number: 99
+  title: Explanatory Compression Judge
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#99
+  status: backlog
+  tier: C
+  pilot: false
+  order: 132
+- id: idea-001-global-workspace-router
+  number: 1
+  title: Global Workspace Router
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#1
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-002-salience-auction
+  number: 2
+  title: Salience Auction
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#2
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-011-action-outcome-world-model
+  number: 11
+  title: Action–Outcome World Model
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#11
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-019-temporal-horizon-stack
+  number: 19
+  title: Temporal Horizon Stack
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#19
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-021-complementary-memory-pair
+  number: 21
+  title: Complementary Memory Pair
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#21
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-022-goal-weighted-replay
+  number: 22
+  title: Goal-Weighted Replay
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#22
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-030-skill-compiler
+  number: 30
+  title: Skill Compiler
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#30
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-033-search-and-learn-controller
+  number: 33
+  title: Search-and-Learn Controller
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#33
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-049-meta-control-bandit
+  number: 49
+  title: Meta-Control Bandit
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#49
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-081-cognitive-needs-regulator
+  number: 81
+  title: Cognitive Needs Regulator
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#81
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-082-competence-progress-drive
+  number: 82
+  title: Competence Progress Drive
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#82
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-083-compression-progress-curiosity
+  number: 83
+  title: Compression-Progress Curiosity
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#83
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-089-strategy-utility-learner
+  number: 89
+  title: Strategy Utility Learner
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#89
+  status: backlog
+  tier: defer
+  pilot: false
+- id: idea-097-compositional-skill-algebra
+  number: 97
+  title: Compositional Skill Algebra
+  source:
+    kind: idea
+    ref: plugin-ideas/README.md#97
+  status: backlog
+  tier: defer
+  pilot: false
