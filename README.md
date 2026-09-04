@@ -11,7 +11,7 @@ meant to be built from it by a coding agent inside Cursor.
 - Spec: [`docs/EXCALIBUR_SPEC.md`](docs/EXCALIBUR_SPEC.md)
 - Kickoff prompt for the building agent: [`docs/KICKOFF_PROMPT.md`](docs/KICKOFF_PROMPT.md)
 - Builder notes (known weak spots + fallbacks): [`docs/BUILDER_NOTES.md`](docs/BUILDER_NOTES.md)
-- Supervisor Automation (scheduled Cursor agent that reviews, unblocks, restarts): [`docs/SUPERVISOR_AUTOMATION.md`](docs/SUPERVISOR_AUTOMATION.md)
+- Supervision (self-scheduled timer by default; optional API-spawned agent or Automation): [`docs/SUPERVISOR_AUTOMATION.md`](docs/SUPERVISOR_AUTOMATION.md)
 - Candidate pool (163 entries imported from dsh-intelligence-lab, 20 marked for the pilot): [`candidates/`](candidates/README.md)
 
 ## What the spec covers
@@ -35,14 +35,15 @@ meant to be built from it by a coding agent inside Cursor.
 
 1. Set the three secrets (`DEEPSEEK_API_KEY`, `DAYTONA_API_KEY`, `EXCALIBUR_BUDGET_USD=18`) in
    Cursor → Cloud Agents → Secrets.
-2. Create the hourly Supervisor Automation from `docs/SUPERVISOR_AUTOMATION.md` (strongest model).
-3. Start a Cloud Agent on this repo and send: *"Read AGENTS.md and act as the Builder/operator. Build
-   Excalibur and run the pilot to completion, ending with results/FINAL_REPORT.md."*
+2. Start a Cloud Agent on this repo and send: *"Read AGENTS.md and act as the Builder/operator. Set up
+   supervision, build Excalibur, and run the pilot to completion, ending with results/FINAL_REPORT.md."*
 
-What happens without you: the builder implements M0–M7 and runs the 20-candidate pilot; the
-supervisor wakes hourly to write meta-reviews, repair controller crashes (bounded, with tests),
-restart a stalled loop, answer the builder's questions, and make sure `results/FINAL_REPORT.md`
-exists. The only things that reach you are a missing/invalid secret or an external outage, written
-to `results/ANSWERS.md` under "NEEDS HUMAN". The deliverable is `results/FINAL_REPORT.md`
+What happens without you: the builder subscribes its own hourly supervisor timer, implements M0–M7,
+and runs the 20-candidate pilot; every hourly wake writes pending meta-reviews, repairs controller
+crashes (bounded, with tests), restarts a stalled loop, answers open questions from the repo, and
+makes sure `results/FINAL_REPORT.md` exists. Optional: add a `CURSOR_API_KEY` secret and the builder
+spawns an independent frontier-model supervisor instead of reviewing its own work.
+
+The only things that reach you are a missing/invalid secret or an external outage, written to `results/ANSWERS.md` under "NEEDS HUMAN". The deliverable is `results/FINAL_REPORT.md`
 (spec §7.5): every candidate's verdict with Δ pass rate, Δ tokens and Δ cost, the accepted stack,
 measured economics, and the recommended next campaign.

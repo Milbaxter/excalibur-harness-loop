@@ -8,9 +8,10 @@
    - `DEEPSEEK_API_KEY`
    - `DAYTONA_API_KEY`
    - `EXCALIBUR_BUDGET_USD` = `18`
-4. Create the **Supervisor Automation** (hourly schedule, strongest model) following
-   `docs/SUPERVISOR_AUTOMATION.md`. It does the meta-reviews, restarts a stalled loop, and answers
-   the builder's questions while you sleep.
+4. Supervision needs **no setup**: the builder subscribes its own hourly timer (Tier A in
+   `docs/SUPERVISOR_AUTOMATION.md`). Optional upgrades: add a `CURSOR_API_KEY` secret so the
+   builder spawns an independent frontier-model supervisor (Tier B), or create a manual
+   Automation (Tier C).
 5. Start a Cloud Agent on this repo (branch `main`) with the building model and paste the prompt below.
    If long-running agents are not available on your plan, run the same prompt from a local Cursor
    agent on your machine instead; the pilot takes roughly 2–4 hours. Optionally copy the builder
@@ -22,9 +23,9 @@
 Shortest version (the repo's `AGENTS.md` carries the binding constraints, so this is enough):
 
 ```
-Read AGENTS.md in this repo and act as the Builder/operator. Build Excalibur milestone by milestone
-and run the pilot to completion, ending with results/FINAL_REPORT.md. Do not stop to ask unless a
-secret is missing.
+Read AGENTS.md in this repo and act as the Builder/operator. Set up supervision (Step 0), then build
+Excalibur milestone by milestone and run the pilot to completion, ending with results/FINAL_REPORT.md.
+Do not stop to ask unless a secret is missing.
 ```
 
 Full version (identical intent, useful if you want every constraint in the conversation):
@@ -61,9 +62,10 @@ WORKING RULES
 - If the DSH version you pin differs from the spec's assumptions (CLI flags, patch format, session log
   fields), adapt the adapter and document the deltas in docs/DSH_NOTES.md; do not change the protocol.
 - On any uncaught exception the controller must write results/incidents/<ts>.md (traceback, command,
-  ledger tail) and commit it before exiting; the Supervisor Automation uses it to repair and restart.
-- A Supervisor Automation may commit under results/meta/**, results/SUPERVISOR_LOG.md,
-  results/ANSWERS.md and may fix controller bugs under excalibur/ with tests. `git pull --rebase`
+  ledger tail) and commit it before exiting; the supervisor wake uses it to repair and restart.
+- Set up supervision first (AGENTS.md Step 0: hourly timer named excalibur-supervisor). A supervisor
+  may commit under results/meta/**, results/SUPERVISOR_LOG.md, results/ANSWERS.md and may fix
+  controller bugs under excalibur/ with tests. `git pull --rebase`
   before every commit and read results/ANSWERS.md when it changes.
 - If you are blocked on something only a human can decide, finish everything that doesn't depend on
   it, commit, and end your turn with the question stated in one paragraph.
@@ -84,7 +86,7 @@ CANDIDATES
 PILOT (M7) SPECIFICS
 - Queue: exactly the 20 entries with pilot: true, in their `order`. Do not add others.
 - Trigger one meta-review after 8 decided candidates: write results/meta/1/bundle.md, commit, push,
-  and keep going; the Supervisor Automation writes proposals.json (builder notes §4 has the fallback).
+  and keep going; the supervisor wake writes proposals.json (builder notes §4 has the fallback).
   Ingest proposals per §9.4 but do NOT auto-implement new candidates in the pilot (queue them only).
 - Stop when the queue is empty, the budget cap fires, or 20 candidates are decided.
 
@@ -104,8 +106,8 @@ Start with M0 now.
 - Watch `results/ledger.jsonl` and `results/milestones/` in the repo; every decision is committed.
 - Check DeepSeek spend in the DeepSeek dashboard once or twice; the in-repo `budget.py` estimate is
   derived from token counts and can drift a few percent from the invoice.
-- If the agent stops with a question, the supervisor will try to answer it on its next wake (see
-  results/ANSWERS.md); otherwise answer it in the same conversation. It resumes from the ledger.
+- If the agent stops with a question, its hourly wake will try to answer it from the repo (see
+  results/ANSWERS.md); only "NEEDS HUMAN" entries need you. It resumes from the ledger.
 
 ## After the pilot
 

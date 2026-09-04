@@ -50,9 +50,10 @@ minimal composition (persona + bash + fs read/write only) per spec §5.4 step 4.
 
 ## 4. Meta-review is asynchronous; the primary reviewer is a scheduled Cursor agent
 
-Spec §9.2 describes this; the operational detail is here. A **Supervisor Automation** (see `docs/SUPERVISOR_AUTOMATION.md`) wakes
-hourly, finds any `results/meta/<n>/bundle.md` without a `proposals.json`, writes the proposals, and
-commits. The controller must therefore:
+Spec §9.2 describes this; the operational detail is here. A **supervisor wake** (your own hourly timer
+by default, or a separate agent/Automation — see `docs/SUPERVISOR_AUTOMATION.md`) finds any
+`results/meta/<n>/bundle.md` without a `proposals.json`, writes the proposals, and commits. The
+controller must therefore:
 
 1. At review time: write `results/meta/<n>/bundle.md` (spec §9.1), `git pull --rebase`, commit, push,
    and **continue with the next batch**. Do not block.
@@ -67,8 +68,9 @@ commits. The controller must therefore:
    authenticated.
 4. Lock discipline: refresh `results/LOCK` (write agent id + ISO timestamp) every 10 minutes while the
    loop runs; delete it on clean exit. The supervisor treats a lock older than 45 minutes as a stall
-   and may run `excalibur resume` itself once M6 is done, so `resume` must be safe to invoke from a
-   fresh VM with nothing but the repo and the secrets.
+   and runs `excalibur resume --max-minutes 40` in the foreground on each wake once M6 is done, so
+   `resume` must be safe to invoke from a fresh VM with nothing but the repo and the secrets, and a
+   pilot batch must finish inside 40 minutes.
 5. Git discipline: `git pull --rebase origin main` before every commit. The supervisor only writes
    under `results/meta/**`, `results/SUPERVISOR_LOG.md`, `results/ANSWERS.md`; never write there
    except to ingest.
